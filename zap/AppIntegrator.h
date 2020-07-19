@@ -118,6 +118,27 @@ public:
 };
 #endif
 
+#ifdef BF_STEAM
+class SteamIntegrator : public AppIntegrator
+{
+
+public:
+   SteamIntegrator();
+   virtual ~SteamIntegrator();
+
+   void init();
+   void shutdown();
+   void runCallbacks();
+
+   void updateState(const string &state);
+   void updateDetails(const string &details);
+
+};
+
+
+
+#endif
+
 } /* namespace Zap */
 
 #endif /* ZAP_APPINTEGRATOR_H_ */

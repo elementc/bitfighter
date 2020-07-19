@@ -231,6 +231,8 @@ set(CLIENT_LIBS
 	${VORBIS_LIBRARIES}
 	${VORBISFILE_LIBRARIES}
 	${DISCORD_LIBRARY}
+	${GRPC_LIBRARY}
+	${PROTOBUF_LIBRARY}
 )
 
 BF_PLATFORM_APPEND_LIBS()
@@ -267,6 +269,12 @@ if(COMPILE_CLIENT)
 	if(COMPILE_TEST_SUITE)
 		include(bitfighter_test.cmake)
 	endif()
+
+	if(STEAM)
+		# Process our Protobuf definitions.
+		generate_cpp_from_protofile(src/steam.proto)
+	endif()
+	
 endif()
 
 
@@ -284,6 +292,8 @@ set(INCLUDE_DIRS
 	${BOOST_INCLUDE_DIR}
 	${CMAKE_SOURCE_DIR}/tnl
 	${CMAKE_SOURCE_DIR}/zap
+	${GRPC_INCLUDE_DIR}
+	${PROTOBUF_INCLUDE_DIR}
 )
 
 if(COMPILE_CLIENT)

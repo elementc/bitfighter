@@ -9,6 +9,7 @@
 
 #include "tnlLog.h"
 
+
 #include <cstdio>
 #include <cstring>
 
@@ -19,6 +20,11 @@
 #  include "UIManager.h"
 #  include "UIGame.h"
 #  include "UIEditor.h"
+#endif
+
+#ifdef BF_STEAM
+#  include <iostream>
+#  include <grpc/grpc.h>
 #endif
 
 
@@ -66,6 +72,9 @@ void AppIntegrationController::init()
    // Instantiate and add any integrators here
 #ifdef BF_DISCORD
    mAppIntegrators.push_back(new DiscordIntegrator());
+#endif
+#ifdef BF_STEAM
+   mAppIntegrators.push_back(new SteamIntegrator());
 #endif
 
    // Run init() on all the integrators
@@ -341,5 +350,48 @@ void DiscordIntegrator::handleDiscordJoinRequest(const DiscordUser *request)
 }
 
 #endif  // BF_DISCORD
+
+#ifdef BF_STEAM
+
+////////////////////////////////////////
+////////////////////////////////////////
+// Steam
+
+SteamIntegrator::SteamIntegrator()
+{
+   std::cout << "Steam: Constructed." << std::endl;
+}
+
+SteamIntegrator::~SteamIntegrator()
+{
+   std::cout << "Steam: Destructed." << std::endl;
+}
+
+void SteamIntegrator::init()
+{
+   std::cout << "Steam: Initialized." << std::endl;
+}
+
+void SteamIntegrator::shutdown()
+{
+   std::cout << "Steam: Shut down." << std::endl;
+}
+
+void SteamIntegrator::runCallbacks()
+{
+ // Do nothing.
+}
+
+void SteamIntegrator::updateState(const string &state)
+{
+   std::cout << "Steam: State updated- " << state << std::endl;
+}
+
+void SteamIntegrator::updateDetails(const string &details)
+{
+   std::cout << "Steam: Details updated- " << details << std::endl;
+}
+
+#endif // BF_STEAM
 
 } /* namespace Zap */

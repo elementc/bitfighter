@@ -174,10 +174,10 @@ void Cursor::enableCursor()
 
 void Cursor::disableCursor()
 {
-   SDL_ShowCursor(0);
+   //SDL_ShowCursor(0);
 
    // Trap mouse
-   SDL_SetWindowGrab(DisplayManager::getScreenInfo()->sdlWindow, SDL_TRUE);
+   //SDL_SetWindowGrab(DisplayManager::getScreenInfo()->sdlWindow, SDL_TRUE);
 }
 
 

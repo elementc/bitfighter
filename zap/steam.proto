@@ -1,0 +1,7 @@
+message StateUpdate {
+    required string state = 1;
+}
+
+message DetailsUpdate {
+    required string details = 1;
+}

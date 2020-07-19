@@ -1,5 +1,5 @@
 project (bitfighter)
-cmake_minimum_required (VERSION 3.1.0)
+cmake_minimum_required (VERSION 3.15)
 
 #
 # CMake options
@@ -10,6 +10,7 @@ option(ALURE_DISABLE_MP3 "Disable dynamic loading of libmpg123.  Disables mp3 co
 option(NO_THREADS "Disable usage of threads in TNL.  May cause issues." NO)
 option(LUAJIT_BUILTIN "Use built-in LuaJIT.  Recommended." YES)
 option(DISCORD "Integrate Discord RPC calls." YES)
+option(STEAM "Integrate Steamworks RPC calls. Requires a launcher app running simultaneously." NO)
 
 
 #
@@ -199,6 +200,13 @@ if(DISCORD)
 	
 	set(DISCORD_LIBRARY discord-rpc)
 	add_definitions(-DBF_DISCORD)
+endif()
+
+# Steam
+if(STEAM)
+	# Steam integration uses gRPC and protobuf to talk with launcher app.
+	include(build/grpc-protobuf-managed.cmake)
+	add_definitions(-DBF_STEAM)
 endif()
 
 
