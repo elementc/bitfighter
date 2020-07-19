@@ -112,6 +112,13 @@ set(EXTRA_SOURCES
 	${CMAKE_SOURCE_DIR}/master/masterInterface.cpp
 )
 
+
+if(STEAM)
+	message("-- Building with Steam.")
+	# Process our Protobuf definitions.
+	generate_cpp_from_protofile(steam.proto)
+endif()
+
 # Client-only classes
 set(CLIENT_SOURCES 
 	AppIntegrator.cpp
@@ -182,6 +189,8 @@ set(CLIENT_SOURCES
 	voiceCodec.cpp
 	${CMAKE_SOURCE_DIR}/fontstash/stb_truetype.c
 	${CMAKE_SOURCE_DIR}/fontstash/fontstash.c
+	${generated_pb_srcs}
+	${generated_grpc_srcs}
 )
 
 file(GLOB BITFIGHTER_HEADERS *.h)
@@ -269,12 +278,6 @@ if(COMPILE_CLIENT)
 	if(COMPILE_TEST_SUITE)
 		include(bitfighter_test.cmake)
 	endif()
-
-	if(STEAM)
-		# Process our Protobuf definitions.
-		generate_cpp_from_protofile(src/steam.proto)
-	endif()
-	
 endif()
 
 
@@ -303,6 +306,7 @@ if(COMPILE_CLIENT)
 		${SDL_INCLUDE_DIR}
 		${SPEEX_INCLUDE_DIR}
 		${SPARKLE_INCLUDE_DIR}
+		${generated_header_dir}
 	)
 	
 	if(COMPILE_TEST_SUITE)

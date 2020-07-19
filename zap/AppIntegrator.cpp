@@ -24,7 +24,9 @@
 
 #ifdef BF_STEAM
 #  include <iostream>
-#  include <grpc/grpc.h>
+# include "steam.grpc.pb.h"
+# include <grpcpp/grpcpp.h>
+# include <grpc/support/log.h>
 #endif
 
 

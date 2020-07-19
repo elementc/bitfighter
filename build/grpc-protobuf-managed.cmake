@@ -28,6 +28,7 @@ endif()
 #   - generated_grpc_srcs: list of all .grpc.pb.cc files.
 #   - generated_pb_hdrs: list of all .pb.h files.
 #   - generated_grpc_hdrs: list of all .grpc.pb.h files.
+#   - generated_header_dir: a path to include all of the generated headers.
 #
 # Make sure to add the srcs lists to your executable or library so that your protobuf cc files get built,
 # and to add ${CMAKE_CURRENT_BINARY_DIR}/pb_headers/ to your include path, so that your headers are findable.
@@ -39,10 +40,13 @@ function(generate_cpp_from_protofile protofile_name)
   get_filename_component(protofile_path "${absolute_protofile_name}" PATH)
 
   # Assemble generated protoc output file names.
+  set(hdr_include_dir "${CMAKE_CURRENT_BINARY_DIR}/pb_headers")
   set(proto_src "${CMAKE_CURRENT_BINARY_DIR}/${base_protofile_name}.pb.cc")
-  set(proto_hdr "${CMAKE_CURRENT_BINARY_DIR}/pb_headers/${base_protofile_name}.pb.h")
+  set(proto_hdr "${hdr_include_dir}/${base_protofile_name}.pb.h")
   set(grpc_src "${CMAKE_CURRENT_BINARY_DIR}/${base_protofile_name}.grpc.pb.cc")
-  set(grpc_hdr "${CMAKE_CURRENT_BINARY_DIR}/pb_headers/${base_protofile_name}.grpc.pb.h")
+  set(grpc_hdr "${hdr_include_dir}/${base_protofile_name}.grpc.pb.h")
+
+  #
 
   # Abort if a generated file name matches one we've already written a rule for-
   # they must be uniquely named or the protoc step will overwrite the one that runs first.
@@ -59,12 +63,13 @@ function(generate_cpp_from_protofile protofile_name)
           -I "${protofile_path}"
           --plugin=protoc-gen-grpc="${_GRPC_CPP_PLUGIN_EXECUTABLE}"
           "${absolute_protofile_name}"
-        DEPENDS "${protofile_path}")
+        DEPENDS "${absolute_protofile_name}")
 
   # Add the generated file names to the list of generated proto files, so that they can be included in builds.
   set(generated_pb_srcs ${proto_src} ${generated_pb_srcs} PARENT_SCOPE)
   set(generated_grpc_srcs ${grpc_src} ${generated_grpc_srcs} PARENT_SCOPE)
   set(generated_pb_hdrs ${proto_hdr} ${generated_pb_hdrs} PARENT_SCOPE)
   set(generated_grpc_hdrs ${proto_src} ${generated_grpc_hdrs} PARENT_SCOPE)
+  set(generated_header_dir ${hdr_include_dir} PARENT_SCOPE)
 
 endfunction()
