@@ -295,8 +295,6 @@ set(INCLUDE_DIRS
 	${BOOST_INCLUDE_DIR}
 	${CMAKE_SOURCE_DIR}/tnl
 	${CMAKE_SOURCE_DIR}/zap
-	${GRPC_INCLUDE_DIR}
-	${PROTOBUF_INCLUDE_DIR}
 )
 
 if(COMPILE_CLIENT)
@@ -307,6 +305,8 @@ if(COMPILE_CLIENT)
 		${SPEEX_INCLUDE_DIR}
 		${SPARKLE_INCLUDE_DIR}
 		${generated_header_dir}
+		${GRPC_INCLUDE_DIR}
+		${PROTOBUF_INCLUDE_DIR}
 	)
 	
 	if(COMPILE_TEST_SUITE)
@@ -318,4 +318,5 @@ endif()
 # but we don't use it for compatibility with older CMake 2.8
 include_directories(SYSTEM
 	${INCLUDE_DIRS}
+	${generated_protobuf_header_dir}
 )

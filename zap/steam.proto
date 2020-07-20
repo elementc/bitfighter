@@ -1,7 +1,33 @@
-message StateUpdate {
-    required string state = 1;
+syntax = "proto3";
+
+package steam;
+
+service Steam{
+    rpc InitSteamworks (SteamworksInitRequest) returns (SteamworksInitResult) {}
+    rpc UpdateGameState(StateUpdateMessage) returns (StateUpdateAck) {}
+    rpc UpdateGameDetails(DetailsUpdateMessage) returns (DetailsUpdateAck) {}
 }
 
-message DetailsUpdate {
-    required string details = 1;
+message SteamworksInitRequest {
+
+}
+
+message SteamworksInitResult {
+    string user_name = 1;
+    bool succeeded = 2;
+
+}
+
+message StateUpdateMessage {
+    string state = 1;
+}
+
+message StateUpdateAck {
+}
+
+message DetailsUpdateMessage {
+    string details = 1;
+}
+
+message DetailsUpdateAck {
 }
