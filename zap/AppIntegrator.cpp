@@ -23,10 +23,7 @@
 #endif
 
 #ifdef BF_STEAM
-#  include <iostream>
-# include "steam.grpc.pb.h"
-# include <grpcpp/grpcpp.h>
-# include <grpc/support/log.h>
+// no steam-specific includes yet.
 #endif
 
 
@@ -360,6 +357,8 @@ void DiscordIntegrator::handleDiscordJoinRequest(const DiscordUser *request)
 // Steam
 
 SteamIntegrator::SteamIntegrator()
+: sc(grpc::CreateChannel(
+      "localhost:50051", grpc::InsecureChannelCredentials()))
 {
    std::cout << "Steam: Constructed." << std::endl;
 }
@@ -371,7 +370,7 @@ SteamIntegrator::~SteamIntegrator()
 
 void SteamIntegrator::init()
 {
-   std::cout << "Steam: Initialized." << std::endl;
+   sc.InitSteamworks(state);
 }
 
 void SteamIntegrator::shutdown()
@@ -386,11 +385,13 @@ void SteamIntegrator::runCallbacks()
 
 void SteamIntegrator::updateState(const string &state)
 {
+   sc.UpdateGameState(state);
    std::cout << "Steam: State updated- " << state << std::endl;
 }
 
 void SteamIntegrator::updateDetails(const string &details)
 {
+   sc.UpdateGameDetails(details);
    std::cout << "Steam: Details updated- " << details << std::endl;
 }
 
