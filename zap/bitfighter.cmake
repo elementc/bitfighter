@@ -18,8 +18,6 @@ add_dependencies(${BF_EXE_NAME}
 target_link_libraries(${BF_EXE_NAME}
 	${CLIENT_LIBS}
 	${SHARED_LIBS}
-	${GRPC_LIBRARY}
-	${PROTOBUF_LIBRARY}
 )
 
 # Where to put the executable

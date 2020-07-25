@@ -189,8 +189,8 @@ set(CLIENT_SOURCES
 	voiceCodec.cpp
 	${CMAKE_SOURCE_DIR}/fontstash/stb_truetype.c
 	${CMAKE_SOURCE_DIR}/fontstash/fontstash.c
-	${generated_pb_srcs}
 	${generated_grpc_srcs}
+	${generated_pb_srcs}
 )
 
 file(GLOB BITFIGHTER_HEADERS *.h)
@@ -229,6 +229,8 @@ set(SHARED_LIBS
 
 # libraries used only on the client
 set(CLIENT_LIBS
+	${GRPC_LIBRARY}
+	${PROTOBUF_LIBRARY}
 	${SDL_LIBRARY}	
 	${PNG_LIBRARY}
 	${GL_LIBRARY}
@@ -240,8 +242,6 @@ set(CLIENT_LIBS
 	${VORBIS_LIBRARIES}
 	${VORBISFILE_LIBRARIES}
 	${DISCORD_LIBRARY}
-	${GRPC_LIBRARY}
-	${PROTOBUF_LIBRARY}
 )
 
 BF_PLATFORM_APPEND_LIBS()

@@ -1,16 +1,30 @@
 include(FetchContent)
+
+# turn off some parts of gRPC we don't care about.
+
+set(gRPC_BUILD_TESTS OFF)
+# set(gRPC_BUILD_CODEGEN OFF)
+set(gRPC_BUILD_CSHARP_EXT OFF)
+set(gRPC_BUILD_GRPC_CSHARP_PLUGIN OFF)
+set(gRPC_BUILD_GRPC_NODE_PLUGIN OFF)
+set(gRPC_BUILD_GRPC_OBJECTIVE_C_PLUGIN OFF)
+set(gRPC_BUILD_GRPC_PHP_PLUGIN OFF)
+set(gRPC_BUILD_GRPC_PYTHON_PLUGIN OFF)
+set(gRPC_BUILD_GRPC_RUBY_PLUGIN OFF)
+set(gRPC_USE_PROTO_LITE ON)
+
 FetchContent_Declare(
   gRPC
   GIT_REPOSITORY https://github.com/grpc/grpc
-  GIT_TAG        v1.28.0
+  GIT_TAG        v1.30.2
   )
 set(FETCHCONTENT_QUIET OFF)
 FetchContent_MakeAvailable(gRPC)
 
 # Since FetchContent uses add_subdirectory under the hood, we can use
 # the grpc and protobuf targets directly from this build.
-set(_PROTOBUF_LIBPROTOBUF libprotobuf)
-set(PROTOBUF_LIBRARY libprotobuf)
+set(_PROTOBUF_LIBPROTOBUF libprotobuf-lite)
+set(PROTOBUF_LIBRARY libprotobuf-lite)
 set(PROTOBUF_INCLUDE_DIR ${FETCHCONTENT_BASE_DIR}/grpc-src/third_party/protobuf/src)
 set(_REFLECTION grpc++_reflection)
 set(_PROTOBUF_PROTOC $<TARGET_FILE:protoc>)
@@ -21,6 +35,18 @@ if(CMAKE_CROSSCOMPILING)
   find_program(_GRPC_CPP_PLUGIN_EXECUTABLE grpc_cpp_plugin)
 else()
   set(_GRPC_CPP_PLUGIN_EXECUTABLE $<TARGET_FILE:grpc_cpp_plugin>)
+endif()
+
+# gRPC needs WINNT defined appropriately, which isn't done for us by CMake.
+# credit to alalek on https://github.com/opencv/opencv/pull/15891/files
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows") 
+  get_directory_property(__DIRECTORY_COMPILE_DEFINITIONS COMPILE_DEFINITIONS) 
+  if(NOT " ${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_RELEASE} ${__DIRECTORY_COMPILE_DEFINITIONS}" MATCHES "_WIN32_WINNT")
+    # https://docs.microsoft.com/en-us/cpp/porting/modifying-winver-and-win32-winnt 
+    # Target Windows 7 API 
+    set(GRPC_CMAKE_MACRO_WIN32_WINNT "0x0601" CACHE STRING "Value of _WIN32_WINNT macro") 
+    add_definitions(-D_WIN32_WINNT=${GRPC_CMAKE_MACRO_WIN32_WINNT}) 
+  endif() 
 endif()
 
 # A utility function that:
