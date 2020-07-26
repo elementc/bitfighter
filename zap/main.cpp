@@ -72,21 +72,8 @@ include (replaces require)
 #  pragma warning (disable: 4996)     // Disable POSIX deprecation, certain security warnings that seem to be specific to VC++
 #endif
 
-#include "IniFile.h"
-#include "SystemFunctions.h"
-
-#include "tnl.h"
-#include "tnlRandom.h"
-#include "tnlGhostConnection.h"
-#include "tnlJournal.h"
-
-#include "zapjournal.h"
-
-#include "GameManager.h"
-
-using namespace TNL;
-
 #ifndef ZAP_DEDICATED
+#  include "AppIntegrator.h"
 #  include "UIGame.h"
 #  include "UINameEntry.h"
 #  include "UIEditor.h"
@@ -107,8 +94,21 @@ using namespace TNL;
 #  include "VideoSystem.h"
 #  include "ClientGame.h"
 #  include "FontManager.h"
-#  include "AppIntegrator.h"
 #endif
+
+#include "IniFile.h"
+#include "SystemFunctions.h"
+
+#include "tnl.h"
+#include "tnlRandom.h"
+#include "tnlGhostConnection.h"
+#include "tnlJournal.h"
+
+#include "zapjournal.h"
+
+#include "GameManager.h"
+
+using namespace TNL; // Must come after #include AppIntegrator, so that TNL::ByteBuffer doesn't fight with grpc::ByteBuffer.
 
 #include "ServerGame.h"
 #include "version.h"       // For BUILD_VERSION def

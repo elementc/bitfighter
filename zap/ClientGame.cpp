@@ -3,6 +3,9 @@
 // See LICENSE.txt for full copyright information
 //------------------------------------------------------------------------------
 
+// AppIntegrator.h needs to be first, so that we dont have fights between TNL::ByteBuffer and grpc::ByteBuffer
+#include "AppIntegrator.h"
+
 #include "ClientGame.h"
 
 #include "GameManager.h"
@@ -31,7 +34,6 @@
 
 #include "GameRecorderPlayback.h"
 #include "UIGame.h"
-#include "AppIntegrator.h"
 
 using namespace TNL;
 

@@ -5,11 +5,6 @@
 #ifndef ZAP_APPINTEGRATOR_H_
 #define ZAP_APPINTEGRATOR_H_
 
-#include "tnlTypes.h"
-#include "tnlVector.h"
-
-#include <string>
-
 #ifdef BF_STEAM
 // These imports need to happen outside namespace Zap
 # include <iostream>
@@ -17,7 +12,18 @@
 # include <grpcpp/grpcpp.h>
 #endif
 
-using namespace TNL;
+#include "tnlTypes.h"
+#include "tnlVector.h"
+
+#include <string>
+
+
+//using namespace TNL;
+using TNL::U32;
+using TNL::S64;
+using TNL::S32;
+using TNL::S8;
+using TNL::Vector;
 
 namespace Zap
 {
