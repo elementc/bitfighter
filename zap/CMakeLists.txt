@@ -128,6 +128,7 @@ set(CLIENT_SOURCES
 	ConnectionStatsRenderer.cpp
 	ClientGame.cpp
 	Cursor.cpp
+	DiscordIntegrator.cpp
 	EditorAttributeMenuItemBuilder.cpp
 	EditorPlugin.cpp
 	EditorTeam.cpp
@@ -159,6 +160,7 @@ set(CLIENT_SOURCES
 	ShipShape.cpp
 	SlideOutWidget.cpp
 	sparkManager.cpp
+	SteamIntegrator.cpp
 	SymbolShape.cpp
 	TeamShuffleHelper.cpp
 	TimeLeftRenderer.cpp

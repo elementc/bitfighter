@@ -3,6 +3,7 @@
 // See LICENSE.txt for full copyright information
 //------------------------------------------------------------------------------
 
+#include "AppIntegrator.h"
 #include "GameSettings.h"
 
 #include "SharedConstants.h"  // For MAX_PLAYERS
@@ -966,10 +967,11 @@ void GameSettings::onFinishedLoading()
 }
 
 
-// We need to show the name entry screen unless user has specified a nickname via the cmd line or the INI file
+// We need to show the name entry screen unless user has specified a nickname via the cmd line or the INI file, or gets one from an app integration.
 bool GameSettings::shouldShowNameEntryScreenOnStartup()
 {
-   return getString(LOGIN_NAME) == "" && mIniSettings.name == "";
+
+   return getString(LOGIN_NAME) == "" && mIniSettings.name == "" && AppIntegrationController::getNickname() == "";
 }
 
 

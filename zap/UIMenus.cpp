@@ -45,6 +45,7 @@
 #include <math.h>
 
 #include "GameRecorderPlayback.h"
+#include "AppIntegrator.h"
 
 namespace Zap
 {
@@ -1189,9 +1190,11 @@ void OptionsMenuUserInterface::setupMenus()
    addMenuItem(new MenuItem(getMenuItemCount(), "IN-GAME HELP", inGameHelpSelectedCallback, 
                         "Change settings related to in-game tutorial/help", KEY_H));
 
-   addMenuItem(new YesNoMenuItem("AUTOLOGIN:", !settings->shouldShowNameEntryScreenOnStartup(), 
-                                 "If selected, you will automatically log in "
-                                 "on start, bypassing the first screen", KEY_A));
+   if (AppIntegrationController::getNickname() == ""){ // Add if an integration isn't providing nicknames for us.
+      addMenuItem(new YesNoMenuItem("AUTOLOGIN:", !settings->shouldShowNameEntryScreenOnStartup(), 
+                                    "If selected, you will automatically log in "
+                                    "on start, bypassing the first screen", KEY_A));
+   }
 
 #ifndef TNL_OS_MOBILE
    addMenuItem(getWindowModeMenuItem((U32)settings->getIniSettings()->mSettings.getVal<DisplayMode>("WindowMode")));

@@ -1232,6 +1232,9 @@ int main(int argc, char **argv)
       moveToAppPath();
 #endif
 
+      // Init 3rd-party app integrations
+      AppIntegrationController::init();
+
       if(!VideoSystem::init())                // Initialize video and window system
          shutdownBitfighter();
 
@@ -1276,9 +1279,6 @@ int main(int argc, char **argv)
             uiManager->activate(ui);
          }
       }
-
-      // Init 3rd-party app integrations
-      AppIntegrationController::init();
 
 #endif   // !ZAP_DEDICATED
 
