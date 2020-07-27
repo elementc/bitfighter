@@ -3,7 +3,6 @@
 // See LICENSE.txt for full copyright information
 //------------------------------------------------------------------------------
 
-
 #include "GameSettings.h"
 
 #include "SharedConstants.h"  // For MAX_PLAYERS
