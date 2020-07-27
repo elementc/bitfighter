@@ -3,7 +3,7 @@
 // See LICENSE.txt for full copyright information
 //------------------------------------------------------------------------------
 
-#include "AppIntegrator.h"
+
 #include "GameSettings.h"
 
 #include "SharedConstants.h"  // For MAX_PLAYERS
@@ -23,6 +23,7 @@
 #endif
 
 #include "IniFile.h"
+#include "AppIntegrator.h"
 
 #include <stdio.h>
 #include <algorithm>
