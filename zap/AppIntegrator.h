@@ -11,7 +11,10 @@
 #include <string>
 
 
-//using namespace TNL;
+// Because some integrations might pull in libraries that have class naming conflicts on Windows,
+// we can't get away with using namespace TNL; here.
+// For example, Visual Studio will complain about TNL::ByteBuffer colliding with grpc::ByteBuffer.
+// Linux and MacOS builds work fine, actually, so, seems to be a Windows quirk.
 using TNL::U32;
 using TNL::S64;
 using TNL::S32;

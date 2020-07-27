@@ -9,7 +9,6 @@
 
 #include "tnlLog.h"
 
-
 #include <cstdio>
 #include <cstring>
 
@@ -62,12 +61,12 @@ void AppIntegrationController::init()
    // Order matters: if two integrators provide the same service,
    // some hooks like getNickname will return the first integration that is registered.
 
-#ifdef BF_STEAM
-   mAppIntegrators.push_back(new SteamIntegrator());
-#endif
-#ifdef BF_DISCORD
-   mAppIntegrators.push_back(new DiscordIntegrator());
-#endif
+   #ifdef BF_STEAM
+      mAppIntegrators.push_back(new SteamIntegrator());
+   #endif
+   #ifdef BF_DISCORD
+      mAppIntegrators.push_back(new DiscordIntegrator());
+   #endif
 
    // Run init() on all the integrators
    for(int i = 0; i < mAppIntegrators.size(); i++)
