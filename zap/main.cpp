@@ -1166,6 +1166,9 @@ int main(int argc, char **argv)
    // only way to specify a non-standard location is via the command line, which we've now read.
    setupLogging(folderManager->logDir);
 
+   // Init 3rd-party app integrations
+   AppIntegrationController::init();
+
    InputCodeManager::initializeKeyNames();      // Used by loadSettingsFromINI()
 
    // Load our primary settings file
@@ -1230,9 +1233,6 @@ int main(int argc, char **argv)
       // On OS X, make sure we're in the right directory (again)
       moveToAppPath();
 #endif
-
-      // Init 3rd-party app integrations
-      AppIntegrationController::init();
 
       if(!VideoSystem::init())                // Initialize video and window system
          shutdownBitfighter();

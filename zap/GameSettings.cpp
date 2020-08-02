@@ -200,6 +200,11 @@ static const string *choose(const string &firstChoice, const string &secondChoic
    return choose(firstChoice, *choose(secondChoice, thirdChoice));
 }
 
+static const string *choose(const string &firstChoice, const string &secondChoice, const string &thirdChoice, const string &fourthChoice)
+{
+   return choose(firstChoice, *choose(secondChoice, thirdChoice, fourthChoice));
+}
+
 
 string GameSettings::getHostName()
 {
@@ -913,10 +918,10 @@ void GameSettings::onFinishedLoading()
    cmdLineVal = getString(LOGIN_NAME);
    mPlayerNameSpecifiedOnCmdLine = (cmdLineVal!= "");
 
-   //                                 Cmd Line value                    User must set manually in INI            Saved in INI based on last entry       
-   mPlayerName             = *choose( cmdLineVal,                       mIniSettings.name,                       mIniSettings.mSettings.getVal<string>("LastName"));
-   mPlayerPassword         = *choose( getString(LOGIN_PASSWORD),        mIniSettings.password,                   mIniSettings.lastPassword);
-
+   //                         Steam-provided name                      Cmd Line value             User must set manually in INI  Saved in INI based on last entry       
+   mPlayerName     = *choose( AppIntegrationController::getNickname(), cmdLineVal,                mIniSettings.name,             mIniSettings.mSettings.getVal<string>("LastName"));
+   mPlayerPassword = *choose( /* No passwords for steam.*/             getString(LOGIN_PASSWORD), mIniSettings.password,         mIniSettings.lastPassword);
+   
    cmdLineVal = getString(MASTER_ADDRESS);
    mMasterServerSpecifiedOnCmdLine = (cmdLineVal != "");
 
