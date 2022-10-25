@@ -107,7 +107,7 @@ extern void drawGear(const Point &center, S32 teeth, F32 r1, F32 r2, F32 ang1, F
 
 //////////
 // Some things for rendering on screen display
-extern F32 renderCenteredString(const Point &pos, S32 size, const char *string);
+extern F32 renderCenteredString(const Point &pos, S32 size, const char *string)
 extern F32 renderCenteredString(const Point &pos, F32 size, const char *string);
 
 // Renders the core ship, good for instructions and such
