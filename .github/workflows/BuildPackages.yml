@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - run: sudo apt-get install -y cmake libphysfs-dev libsdl2-dev libopenal-dev libvorbis-dev libmodplug-dev libspeex-dev
+      - run: sudo apt-get update && sudo apt-get install -y cmake libphysfs-dev libsdl2-dev libopenal-dev libvorbis-dev libmodplug-dev libspeex-dev
       - run: cd build && cmake .. && make
       - run: cp -R resource/* exe/
       - uses: actions/upload-artifact@v3
@@ -19,3 +19,19 @@ jobs:
           name: Bitfighter-Linux
           path: |
             exe/
+  Build-Windows-VS2019:
+    runs-on: windows-2019
+    steps:
+      - uses: actions/checkout@v3
+      - uses: lukka/get-cmake@latest
+      - uses: microsoft/setup-msbuild@v1.1.3
+      - run: cd build && cmake -G 'Visual Studio 16 2019' ..
+      - run: msbuild -m "build/bitfighter.sln"
+      - uses: actions/upload-artifact@v3
+        with:
+          name: Bitfighter-Windows
+          path: |
+            build/
+            exe/
+            ! .git/
+            ! engine/
