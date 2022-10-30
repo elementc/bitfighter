@@ -19,13 +19,13 @@ jobs:
           name: Bitfighter-Linux
           path: |
             exe/
-  Build-Windows-64bit-VS2022:
+  Build-Windows-VS2017:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v3
       - uses: lukka/get-cmake@latest
       - uses: microsoft/setup-msbuild@v1.1.3
-      - run: cd build && cmake -G 'Visual Studio 17 2022' ..
+      - run: cd build && cmake -G 'Visual Studio 15 2017' ..
       - run: msbuild -m "build/bitfighter.sln"
       - uses: actions/upload-artifact@v3
         with:
