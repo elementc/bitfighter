@@ -20,7 +20,7 @@ jobs:
           path: |
             exe/
   Build-Windows-VS2019:
-    runs-on: windows-latest
+    runs-on: windows-2019
     steps:
       - uses: actions/checkout@v3
       - uses: lukka/get-cmake@latest
