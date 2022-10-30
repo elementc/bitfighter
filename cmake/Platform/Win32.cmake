@@ -229,7 +229,7 @@ function(BF_PLATFORM_INSTALL targetName)
 	install(FILES ${CMAKE_SOURCE_DIR}/zap/bitfighter_win_icon_green.ico DESTINATION ./)
 	
 	# Doc
-	install(FILES ${CMAKE_SOURCE_DIR}/doc/README.md DESTINATION ./)
+	install(FILES ${CMAKE_SOURCE_DIR}/doc/README.txt DESTINATION ./)
 	install(FILES ${CMAKE_SOURCE_DIR}/LICENSE.txt DESTINATION ./)
 	install(FILES ${CMAKE_SOURCE_DIR}/COPYING.txt DESTINATION ./)
 	
