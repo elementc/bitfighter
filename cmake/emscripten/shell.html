@@ -92,11 +92,16 @@
         statusElement.innerHTML = text;
       }
 
-      // Skip the nickname screen. ?master= replaces the master list so a LAN
-      // test can point at an address that will never be contacted.
-      var gameArgs = ['-name', 'WebPilot'];
+      // ?name= skips nickname entry (the LAN test). With no name, the normal
+      // first-run screen is shown. A saved name comes back from IDBFS.
+      // ?master= replaces the master list so a LAN test never dials out.
+      var gameArgs = [];
       try {
-        var master = new URLSearchParams(window.location.search).get('master');
+        var params = new URLSearchParams(window.location.search);
+        var playerName = params.get('name');
+        if (playerName)
+          gameArgs.push('-name', playerName);
+        var master = params.get('master');
         if (master)
           gameArgs.push('-master', master);
       } catch (e) {}
@@ -125,12 +130,45 @@
         },
         canvas: canvasElement,
         setStatus: setStatus,
+        preRun: [function () {
+          addRunDependency('idb-settings');
+          try { FS.mkdir('/persist'); } catch (e) {}
+          FS.mount(IDBFS, {}, '/persist');
+          FS.syncfs(true, function (err) {
+            console.log(err ? ('IDBFS load failed: ' + err) : 'IDBFS load complete');
+            removeRunDependency('idb-settings');
+          });
+        }],
         totalDependencies: 0,
         monitorRunDependencies(left) {
           this.totalDependencies = Math.max(this.totalDependencies, left);
           setStatus(left ? 'Preparing... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
         }
       };
+      // One sync at a time. A second save while the first is still flushing
+      // runs again when the first finishes, so the latest INI is what lands
+      // in IndexedDB.
+      window.bfPersist = function () {
+        if (typeof FS === 'undefined' || !FS.syncfs)
+          return;
+        if (!window.bfPersistState)
+          window.bfPersistState = { busy: false, again: false };
+        var st = window.bfPersistState;
+        function kick() {
+          if (st.busy) { st.again = true; return; }
+          st.busy = true;
+          FS.syncfs(false, function (err) {
+            st.busy = false;
+            console.log(err ? ('IDBFS save failed: ' + err) : 'IDBFS save complete');
+            if (st.again) { st.again = false; kick(); }
+          });
+        }
+        kick();
+      };
+      window.addEventListener('beforeunload', function () {
+        window.bfPersist();
+      });
+
       setStatus('Downloading...');
 
       // Open the relay now, while wasm and the data file are still downloading.

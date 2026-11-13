@@ -24,7 +24,7 @@ set(EMSCRIPTEN_LINK_FLAGS
 	-sFULL_ES2=1 -sMIN_WEBGL_VERSION=1 -sMAX_WEBGL_VERSION=2 \
 	-sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728 -sSTACK_SIZE=5242880 \
 	-sFORCE_FILESYSTEM=1 \
-	-lopenal -lwebsocket.js \
+	-lidbfs.js -lopenal -lwebsocket.js \
 	--shell-file ${CMAKE_SOURCE_DIR}/cmake/emscripten/shell.html \
 	--preload-file ${CMAKE_SOURCE_DIR}/resource@/bitfighter"
 )

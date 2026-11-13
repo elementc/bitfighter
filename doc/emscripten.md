@@ -92,7 +92,7 @@ The relay does not read real master RPC bodies: TNL encrypts them. After a datag
 
 What does not: two browsers still only see each other as the relay's address, not their own. A destination the master never named, and that has not written to this session, is dropped.
 
-The shell passes `-name WebPilot`, so the first screen is the main menu rather than nickname entry. Click the canvas, then:
+The first screen is the nickname entry, as on native. A name saved in the INI is filled in on the next visit. `?name=WebPilot` skips the screen (the LAN test does this). Click the canvas, then:
 
 - Click **HOST GAME**, then **START HOSTING** (or press Enter on that row)
 - `WASD` moves, the mouse aims and fires, `Esc` opens the in-game menu
@@ -100,7 +100,7 @@ The shell passes `-name WebPilot`, so the first screen is the main menu rather t
 
 `ROBOTS` on the host menu is where bot counts live. The startup log may say the UDP socket failed to set its buffer sizes. That is the browser socket layer. A local game still connects through `NetConnection::connectLocal`.
 
-To see the nickname screen instead, remove `arguments: ['-name', 'WebPilot']` from `cmake/emscripten/shell.html` and rebuild.
+Settings and the user INI live in `/persist`, an IndexedDB filesystem mounted before `main` and flushed when the INI is written and when the page unloads. Assets stay in the preloaded `/bitfighter` tree.
 
 ## Main loop
 
@@ -117,8 +117,8 @@ Asyncify was rejected. It rewrites every function that can reach `Platform::slee
 | Master server | UDP via the WebSocket relay, numeric address first | Emscripten's `getaddrinfo` returns a fake address, so hostname entries are skipped. The numeric master is first in the browser list. JOIN waits out a cold relay before it reports a master failure. |
 | UDP to other games | WebSocket relay | Raw UDP does not exist in the browser. Ports 25955 and 28000 are always allowed. Other ports are allowed for ten minutes when the master named them, or when that peer has already sent a packet to the session. |
 | Audio | OpenAL (`-lopenal`) and in-tree ALURE, with the Ogg/Vorbis ports | Sound effects are wav files loaded straight into OpenAL. Menu and credits music are ogg. A click or key resumes the WebAudio context (autoplay policy). |
-| Voice chat (Speex) | `BF_NO_VOICECHAT` | There is no Speex port and no Speex sources in the tree. |
-| Tracker music (ModPlug, `.xm`) | Not decoded | No ModPlug port and no ModPlug sources. `menu.ogg` and `credits.ogg` still play. |
+| Voice chat (Speex) | Speex 1.2.1, fetched at configure time | Encode and decode match native. The microphone is the OpenAL capture device, which asks for `getUserMedia` on the voice-chat key. A headless browser has no microphone, so capture fails there and playback of received voice still works. |
+| Tracker music (ModPlug, `.xm`) | Emscripten libmodplug port, ALURE decoder | Game tracks are `.xm`. The same `createDecoder` path used for ogg reads them. `menu.ogg` and `credits.ogg` are unchanged. |
 | Discord RPC | `DISCORD=OFF` | The RPC transport is a local socket. |
 | Test suite | Not built | gtest's pthread setup fights the single-threaded build. Native tests are unchanged. |
 

@@ -1792,6 +1792,11 @@ void NameEntryUserInterface::onActivate()
    Parent::onActivate();
    setupMenu();
    getGame()->setReadyToConnectToMaster(false);
+#ifdef __EMSCRIPTEN__
+   // LastName is what the field shows. Nickname (autologin) is what skips this screen.
+   logprintf(LogConsumer::LogConnection, "Name entry: %s",
+             getGame()->getSettings()->getIniSettings()->mSettings.getVal<string>("LastName").c_str());
+#endif
 }
 
 

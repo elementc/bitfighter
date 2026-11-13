@@ -1199,6 +1199,15 @@ int main(int argc, char **argv)
    for(S32 i = 1; i < argc; i++)
       argVector.push_back(argv[i]);
 
+#ifdef __EMSCRIPTEN__
+   // Mention IDBFS from compiled code so -O3 keeps libidbfs.js. The page
+   // shell mounts /persist and syncs it before main runs.
+   EM_ASM({
+      if (typeof IDBFS === 'undefined')
+         console.log('IDBFS missing');
+   });
+#endif
+
    // We change our current directory to be useful, usually to the location the executable resides
    normalizeWorkingDirectory();
 
@@ -1228,6 +1237,12 @@ int main(int argc, char **argv)
    settings->resolveDirs();                     // Figures out where all our folders are (except leveldir)
 
    FolderManager *folderManager = settings->getFolderManager();
+
+#ifdef __EMSCRIPTEN__
+   // There is no -inidir flag. Standalone mode would write bitfighter.ini into
+   // the preloaded asset tree, which a reload wipes. Settings live on IDBFS.
+   folderManager->iniDir = "/persist";
+#endif
 
    // Before we go any further, we should get our log files in order.  We know where they'll be, as the
    // only way to specify a non-standard location is via the command line, which we've now read.

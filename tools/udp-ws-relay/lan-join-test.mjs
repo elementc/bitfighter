@@ -182,7 +182,8 @@ try {
 
   const url = 'http://127.0.0.1:' + httpPort + '/bitfighter.html'
     + '?relay=ws://127.0.0.1:' + relayPort
-    + '&master=bitfighter.invalid:25955';
+    + '&master=bitfighter.invalid:25955'
+    + '&name=WebPilot';
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120000 });
 
   const output = page.locator('#output');
