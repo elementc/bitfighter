@@ -132,6 +132,44 @@
         }
       };
       setStatus('Downloading...');
+
+      // Open the relay now, while wasm and the data file are still downloading.
+      // A free Render instance can take about a minute to wake; this throwaway
+      // socket overlaps that with the download. The game opens its own socket
+      // later. ?relay= matches the client: off/none/0/empty disables it.
+      (function () {
+        var url = '';
+        try {
+          var params = new URLSearchParams(window.location.search);
+          if (params.has('relay')) {
+            url = params.get('relay') || '';
+            if (url === 'off' || url === 'none' || url === '0')
+              url = '';
+          } else if (typeof Module !== 'undefined' && Module['relay']) {
+            url = Module['relay'];
+          } else {
+            url = 'wss://bitfighter-relay.onrender.com';
+          }
+        } catch (e) {
+          url = 'wss://bitfighter-relay.onrender.com';
+        }
+        if (!url)
+          return;
+        var started = Date.now();
+        function attempt() {
+          if (Date.now() - started > 90000)
+            return;
+          var ws;
+          try { ws = new WebSocket(url); }
+          catch (e) { setTimeout(attempt, 2000); return; }
+          ws.onopen = function () { console.log('UDP relay warmup open'); };
+          ws.onclose = function () {
+            if (Date.now() - started < 90000)
+              setTimeout(attempt, 2000);
+          };
+        }
+        attempt();
+      })();
       window.onerror = window.onunhandledrejection = (e) => {
         setStatus('Exception thrown, see JavaScript console');
         spinnerElement.style.display = 'none';

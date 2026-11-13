@@ -59,7 +59,9 @@ Browsers cannot open raw UDP sockets. Emscripten's `websocket_to_posix_proxy` (`
 
 One WebSocket carries every datagram. Each browser socket is a real UDP socket on the relay. The game code changes only `Socket` send/receive. With the relay disabled, sockets stay on the failing POSIX path and a local game still uses `connectLocal`.
 
-The browser build connects to `wss://bitfighter-relay.onrender.com` unless told otherwise. That host is a free Render service: it allowlists UDP ports 25955 and 28000, and it sleeps after about 15 minutes idle. The client retries the WebSocket for 90 seconds so a cold start (about a minute) can finish. `?relay=wss://other.example/` or `?relay=ws://127.0.0.1:28080` replaces the default. `?relay=`, `?relay=off`, or `?relay=0` disables it. `Module.relay` is only used when the query parameter is absent.
+The browser build connects to `wss://bitfighter-relay.onrender.com` unless told otherwise. That host is a free Render service: it allowlists UDP ports 25955 and 28000, and it sleeps after about 15 minutes idle. The page opens a throwaway WebSocket as soon as the HTML runs, so a cold start (about a minute) overlaps the wasm download. The game then opens its own socket and retries that for 90 seconds. `?relay=wss://other.example/` or `?relay=ws://127.0.0.1:28080` replaces the default. `?relay=`, `?relay=off`, or `?relay=0` disables it. `Module.relay` is only used when the query parameter is absent.
+
+The browser's master list is `IP:107.172.71.173:25955` first. Hostnames are not resolved, and a rejected hostname does not spend the 10 second master retry when another entry remains. JOIN's "gave up on the master" clock starts when the relay socket opens, not when the game starts, and is still 8 seconds after that. Native builds keep the hostname-first list and the original clock.
 
 ```
 python3 tools/udp-ws-relay/relay.py 28080
@@ -108,7 +110,7 @@ Asyncify was rejected. It rewrites every function that can reach `Platform::slee
 | --- | --- | --- |
 | LuaJIT | Official Lua 5.1.5, downloaded by CMake at configure time | The vendored LuaJIT 2.0.5 generates machine code with dynasm and has no WebAssembly backend. The game's C API and scripts are Lua 5.1. The tarball is `https://www.lua.org/ftp/lua-5.1.5.tar.gz` pinned by SHA256, not copied into the git tree. |
 | Threads | `-DNO_THREADS=ON` (`TNL_NO_THREADS`) | pthreads need `SharedArrayBuffer` and cross-origin isolation headers. One-shot threads run inline. `DatabaseAccessThread` drains its queue once instead of looping forever, which would lock the tab. |
-| Master server | UDP via the WebSocket relay, numeric address only | Emscripten's `getaddrinfo` returns a fake address, so hostname entries in the master list are skipped. `107.172.71.173:25955` is contacted through the relay. |
+| Master server | UDP via the WebSocket relay, numeric address first | Emscripten's `getaddrinfo` returns a fake address, so hostname entries are skipped. The numeric master is first in the browser list. JOIN waits out a cold relay before it reports a master failure. |
 | UDP to other games | WebSocket relay, ports 25955 and 28000 | Raw UDP does not exist in the browser. The default relay allowlist drops every other destination port, including arranged-connection peer ports. |
 | Audio | OpenAL (`-lopenal`) and in-tree ALURE, with the Ogg/Vorbis ports | Sound effects are wav files loaded straight into OpenAL. Menu and credits music are ogg. A click or key resumes the WebAudio context (autoplay policy). |
 | Voice chat (Speex) | `BF_NO_VOICECHAT` | There is no Speex port and no Speex sources in the tree. |

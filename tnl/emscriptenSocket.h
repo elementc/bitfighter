@@ -12,6 +12,11 @@ namespace TNL
 {
 
 bool emscriptenRelayEnabled();
+// Milliseconds the server browser should count toward its master give-up.
+// With no relay this is the game's own unconnected clock. With a relay it
+// does not start until that WebSocket is open, and it does not exceed the
+// time since the open, so a cold relay is not reported as a master failure.
+U32 emscriptenRelayMasterWaitMs(U32 gameUnconnectedMs);
 bool emscriptenRelayBind(S32 &outFd, U16 port);
 void emscriptenRelayClose(S32 fd);
 bool emscriptenRelayOwns(S32 fd);

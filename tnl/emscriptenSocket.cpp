@@ -46,7 +46,9 @@ bool gUrlReady = false;
 EMSCRIPTEN_WEBSOCKET_T gWs = 0;
 bool gOpen = false;
 bool gRetryScheduled = false;
+bool gGaveUp = false;
 double gFirstAttempt = 0;
+double gOpenedAt = 0;
 int gGeneration = 0;
 std::map<U32, RelaySock> gSocks;
 std::deque<std::vector<U8>> gEarly;
@@ -151,6 +153,7 @@ void scheduleRetry()
    double elapsed = emscripten_get_now() - gFirstAttempt;
    if(elapsed > RELAY_GIVE_UP_MS)
    {
+      gGaveUp = true;
       logprintf(LogConsumer::LogError, "UDP relay did not connect within 90s (%s). A free host can take about a minute to wake; reload to try again.", gUrl.c_str());
       return;
    }
@@ -163,9 +166,11 @@ EM_BOOL onOpen(int, const EmscriptenWebSocketOpenEvent *, void *userData)
    if((int)(intptr_t)userData != gGeneration)
       return EM_TRUE;
    gOpen = true;
+   gGaveUp = false;
    // A later drop gets its own 90s of retries. The cold-start clock is the
    // stretch before the first successful open.
    gFirstAttempt = emscripten_get_now();
+   gOpenedAt = gFirstAttempt;
    logprintf(LogConsumer::LogUDP, "UDP relay websocket open: %s", gUrl.c_str());
    flushEarly();
    return EM_TRUE;
@@ -177,6 +182,7 @@ EM_BOOL onClose(int, const EmscriptenWebSocketCloseEvent *, void *userData)
       return EM_TRUE;
    gOpen = false;
    gWs = 0;
+   gOpenedAt = 0;
    logprintf(LogConsumer::LogUDP, "UDP relay websocket closed; retrying");
    scheduleRetry();
    return EM_TRUE;
@@ -207,6 +213,7 @@ void connectNow()
       return;
    if(gFirstAttempt == 0)
       gFirstAttempt = emscripten_get_now();
+   gOpenedAt = 0;
    if(gWs)
    {
       EMSCRIPTEN_WEBSOCKET_T old = gWs;
@@ -266,6 +273,25 @@ std::string readRelayUrl()
    return std::string(buf);
 }
 
+}
+
+U32 TNL::emscriptenRelayMasterWaitMs(U32 gameUnconnectedMs)
+{
+   if(!emscriptenRelayEnabled())
+      return gameUnconnectedMs;
+   // Still dialing. The server browser keeps saying "Contacting master".
+   if(gGaveUp)
+      return gameUnconnectedMs > 8000 ? gameUnconnectedMs : 8001;
+   if(!gOpen || gOpenedAt == 0.0)
+      return 0;
+
+   double age = emscripten_get_now() - gOpenedAt;
+   if(age < 0)
+      age = 0;
+   U32 sinceOpen = age > 1.0e9 ? 1000000000u : U32(age);
+   // gameUnconnectedMs is 0 while the master connection is up, and it restarts
+   // if that connection drops. Don't let a long-open socket replace either.
+   return gameUnconnectedMs < sinceOpen ? gameUnconnectedMs : sinceOpen;
 }
 
 bool TNL::emscriptenRelayEnabled()
