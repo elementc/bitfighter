@@ -49,6 +49,8 @@ python3 -m http.server 8080
 
 Open `http://127.0.0.1:8080/bitfighter.html`.
 
+A copy of this build is published from the `emscripten-poc` branch by `.github/workflows/emscripten-pages.yml` to <https://elementc.github.io/bitfighter/>. That workflow runs only on pushes to `emscripten-poc` (and when started by hand).
+
 The shell passes `-name WebPilot`, so the first screen is the main menu rather than nickname entry. Click the canvas, then:
 
 - Click **HOST GAME**, then **START HOSTING** (or press Enter on that row)
