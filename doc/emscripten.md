@@ -2,7 +2,7 @@
 
 This is a minimal WebAssembly build of the Bitfighter client. Native Linux, Windows, and macOS builds are unchanged: every difference is behind `if(EMSCRIPTEN)` or `#ifdef __EMSCRIPTEN__`.
 
-It loads the main menu and can host a local game (the client and server in the same page talk through `NetConnection::connectLocal`, not UDP). It does not speak to the master server, other browsers, or Discord, and it plays no audio.
+It loads the main menu, plays sound, and can host a local game (the client and server in the same page talk through `NetConnection::connectLocal`, not UDP). With the default relay it also talks to the master server and to game servers whose UDP port is 28000.
 
 ## What you need
 
@@ -57,13 +57,15 @@ The page has a **Fullscreen** button. The in-game display-mode control calls `SD
 
 Browsers cannot open raw UDP sockets. Emscripten's `websocket_to_posix_proxy` (`-sPROXY_POSIX_SOCKETS`) does bridge POSIX sockets, but it waits on a futex and needs pthreads plus `SharedArrayBuffer`. GitHub Pages does not send the cross-origin isolation headers that requires, and that mode also fights `emscripten_set_main_loop`. The browser build therefore uses a small relay, `tools/udp-ws-relay/relay.py`.
 
-One WebSocket carries every datagram. Each browser socket is a real UDP socket on the relay. The game code changes only `Socket` send/receive when a relay URL is set. With no URL, sockets stay on the failing POSIX path and a local game still uses `connectLocal`.
+One WebSocket carries every datagram. Each browser socket is a real UDP socket on the relay. The game code changes only `Socket` send/receive. With the relay disabled, sockets stay on the failing POSIX path and a local game still uses `connectLocal`.
+
+The browser build connects to `wss://bitfighter-relay.onrender.com` unless told otherwise. That host is a free Render service: it allowlists UDP ports 25955 and 28000, and it sleeps after about 15 minutes idle. The client retries the WebSocket for 90 seconds so a cold start (about a minute) can finish. `?relay=wss://other.example/` or `?relay=ws://127.0.0.1:28080` replaces the default. `?relay=`, `?relay=off`, or `?relay=0` disables it. `Module.relay` is only used when the query parameter is absent.
 
 ```
 python3 tools/udp-ws-relay/relay.py 28080
 ```
 
-Open the page as `http://127.0.0.1:8080/bitfighter.html?relay=ws://127.0.0.1:28080`. The query parameter wins. `Module.relay` in the shell is the fallback. The hosted page is HTTPS, so a relay it can actually reach has to be `wss://` (put TLS in front of the Python process). An open `ws://` URL from that page is mixed content and the browser blocks it.
+A local relay is `http://127.0.0.1:8080/bitfighter.html?relay=ws://127.0.0.1:28080`. The hosted page is HTTPS, so a relay it can reach has to be `wss://`. An open `ws://` URL from that page is mixed content and the browser blocks it.
 
 Outbound destination ports default to `25955` (master) and `28000` (game). Override with `RELAY_ALLOW_PORTS=25955,28000,28001` or `RELAY_ALLOW_ANY=1`. The default allowlist is intentional: without it the process is an open UDP proxy. Do not put an unrestricted relay on the public internet.
 
@@ -104,8 +106,8 @@ Asyncify was rejected. It rewrites every function that can reach `Platform::slee
 | --- | --- | --- |
 | LuaJIT | Official Lua 5.1.5, downloaded by CMake at configure time | The vendored LuaJIT 2.0.5 generates machine code with dynasm and has no WebAssembly backend. The game's C API and scripts are Lua 5.1. The tarball is `https://www.lua.org/ftp/lua-5.1.5.tar.gz` pinned by SHA256, not copied into the git tree. |
 | Threads | `-DNO_THREADS=ON` (`TNL_NO_THREADS`) | pthreads need `SharedArrayBuffer` and cross-origin isolation headers. One-shot threads run inline. `DatabaseAccessThread` drains its queue once instead of looping forever, which would lock the tab. |
-| Master server | `Game::checkConnectionToMaster` returns immediately | The master protocol is raw UDP. Browser sockets are WebSockets, and a hostname lookup cannot block the main thread. |
-| UDP / internet play | Not implemented | `connectLocal` covers a self-hosted game. Real UDP does not exist in the browser. Emscripten's socket layer can open a datagram socket, but it is a WebSocket stand-in, not a peer. |
+| Master server | UDP via the WebSocket relay, numeric address only | Emscripten's `getaddrinfo` returns a fake address, so hostname entries in the master list are skipped. `107.172.71.173:25955` is contacted through the relay. |
+| UDP to other games | WebSocket relay, ports 25955 and 28000 | Raw UDP does not exist in the browser. The default relay allowlist drops every other destination port, including arranged-connection peer ports. |
 | Audio | OpenAL (`-lopenal`) and in-tree ALURE, with the Ogg/Vorbis ports | Sound effects are wav files loaded straight into OpenAL. Menu and credits music are ogg. A click or key resumes the WebAudio context (autoplay policy). |
 | Voice chat (Speex) | `BF_NO_VOICECHAT` | There is no Speex port and no Speex sources in the tree. |
 | Tracker music (ModPlug, `.xm`) | Not decoded | No ModPlug port and no ModPlug sources. `menu.ogg` and `credits.ogg` still play. |

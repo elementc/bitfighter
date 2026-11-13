@@ -2,6 +2,7 @@
 
 #include "tnlLog.h"
 
+#include <emscripten.h>
 #include <emscripten/websocket.h>
 
 #include <cstdint>
@@ -36,10 +37,17 @@ struct RelaySock
    std::deque<std::vector<U8>> waiting;
 };
 
+const char *DEFAULT_RELAY = "wss://bitfighter-relay.onrender.com";
+const double RELAY_GIVE_UP_MS = 90000.0;
+const double RELAY_RETRY_MS = 2000.0;
+
 std::string gUrl;
 bool gUrlReady = false;
 EMSCRIPTEN_WEBSOCKET_T gWs = 0;
 bool gOpen = false;
+bool gRetryScheduled = false;
+double gFirstAttempt = 0;
+int gGeneration = 0;
 std::map<U32, RelaySock> gSocks;
 std::deque<std::vector<U8>> gEarly;
 U32 gNextId = 1;
@@ -126,47 +134,111 @@ void handleFrame(const U8 *data, U32 len)
    }
 }
 
-EM_BOOL onOpen(int, const EmscriptenWebSocketOpenEvent *, void *)
+void connectNow();
+
+void retryCb(void *)
 {
+   gRetryScheduled = false;
+   if(gOpen || gUrl.empty())
+      return;
+   connectNow();
+}
+
+void scheduleRetry()
+{
+   if(gRetryScheduled || gUrl.empty())
+      return;
+   double elapsed = emscripten_get_now() - gFirstAttempt;
+   if(elapsed > RELAY_GIVE_UP_MS)
+   {
+      logprintf(LogConsumer::LogError, "UDP relay did not connect within 90s (%s). A free host can take about a minute to wake; reload to try again.", gUrl.c_str());
+      return;
+   }
+   gRetryScheduled = true;
+   emscripten_set_timeout(retryCb, RELAY_RETRY_MS, 0);
+}
+
+EM_BOOL onOpen(int, const EmscriptenWebSocketOpenEvent *, void *userData)
+{
+   if((int)(intptr_t)userData != gGeneration)
+      return EM_TRUE;
    gOpen = true;
+   // A later drop gets its own 90s of retries. The cold-start clock is the
+   // stretch before the first successful open.
+   gFirstAttempt = emscripten_get_now();
    logprintf(LogConsumer::LogUDP, "UDP relay websocket open: %s", gUrl.c_str());
    flushEarly();
    return EM_TRUE;
 }
 
-EM_BOOL onClose(int, const EmscriptenWebSocketCloseEvent *, void *)
+EM_BOOL onClose(int, const EmscriptenWebSocketCloseEvent *, void *userData)
 {
+   if((int)(intptr_t)userData != gGeneration)
+      return EM_TRUE;
    gOpen = false;
-   logprintf(LogConsumer::LogUDP, "UDP relay websocket closed");
+   gWs = 0;
+   logprintf(LogConsumer::LogUDP, "UDP relay websocket closed; retrying");
+   scheduleRetry();
    return EM_TRUE;
 }
 
-EM_BOOL onError(int, const EmscriptenWebSocketErrorEvent *, void *)
+EM_BOOL onError(int, const EmscriptenWebSocketErrorEvent *, void *userData)
 {
-   logprintf(LogConsumer::LogError, "UDP relay websocket error (%s)", gUrl.c_str());
+   if((int)(intptr_t)userData != gGeneration)
+      return EM_TRUE;
+   logprintf(LogConsumer::LogError, "UDP relay websocket error (%s); retrying", gUrl.c_str());
+   scheduleRetry();
    return EM_TRUE;
 }
 
-EM_BOOL onMessage(int, const EmscriptenWebSocketMessageEvent *event, void *)
+EM_BOOL onMessage(int, const EmscriptenWebSocketMessageEvent *event, void *userData)
 {
+   if((int)(intptr_t)userData != gGeneration)
+      return EM_TRUE;
    if(event->isText)
       return EM_TRUE;
    handleFrame(event->data, event->numBytes);
    return EM_TRUE;
 }
 
-void ensureSocket()
+void connectNow()
 {
-   if(gWs)
+   if(gUrl.empty())
       return;
+   if(gFirstAttempt == 0)
+      gFirstAttempt = emscripten_get_now();
+   if(gWs)
+   {
+      EMSCRIPTEN_WEBSOCKET_T old = gWs;
+      gWs = 0;
+      gOpen = false;
+      emscripten_websocket_close(old, 1000, 0);
+      emscripten_websocket_delete(old);
+   }
+   gGeneration++;
    EmscriptenWebSocketCreateAttributes attr;
    emscripten_websocket_init_create_attributes(&attr);
    attr.url = gUrl.c_str();
    gWs = emscripten_websocket_new(&attr);
-   emscripten_websocket_set_onopen_callback(gWs, 0, onOpen);
-   emscripten_websocket_set_onclose_callback(gWs, 0, onClose);
-   emscripten_websocket_set_onerror_callback(gWs, 0, onError);
-   emscripten_websocket_set_onmessage_callback(gWs, 0, onMessage);
+   if(!gWs)
+   {
+      logprintf(LogConsumer::LogError, "UDP relay websocket create failed (%s)", gUrl.c_str());
+      scheduleRetry();
+      return;
+   }
+   void *generation = (void *)(intptr_t)gGeneration;
+   emscripten_websocket_set_onopen_callback(gWs, generation, onOpen);
+   emscripten_websocket_set_onclose_callback(gWs, generation, onClose);
+   emscripten_websocket_set_onerror_callback(gWs, generation, onError);
+   emscripten_websocket_set_onmessage_callback(gWs, generation, onMessage);
+   logprintf(LogConsumer::LogUDP, "UDP relay connecting: %s", gUrl.c_str());
+}
+
+void ensureSocket()
+{
+   if(gWs || gOpen)
+      return;
+   connectNow();
 }
 
 std::string readRelayUrl()
@@ -175,13 +247,22 @@ std::string readRelayUrl()
    buf[0] = 0;
    EM_ASM({
       var q = '';
-      try {
-         q = new URLSearchParams(window.location.search).get('relay') || '';
-      } catch (e) {}
-      if (!q && typeof Module !== 'undefined' && Module['relay'])
+      var params = null;
+      try { params = new URLSearchParams(window.location.search); } catch (e) {}
+      // ?relay= is explicit. Empty, "off", or "0" disables. Anything else
+      // replaces the default. With no query param, Module.relay wins, then
+      // the hosted relay.
+      if (params && params.has('relay')) {
+         q = params.get('relay') || '';
+         if (q === 'off' || q === 'none' || q === '0')
+            q = '';
+      } else if (typeof Module !== 'undefined' && Module['relay']) {
          q = Module['relay'];
+      } else {
+         q = UTF8ToString($2);
+      }
       stringToUTF8(q, $0, $1);
-   }, buf, (int)sizeof(buf));
+   }, buf, (int)sizeof(buf), DEFAULT_RELAY);
    return std::string(buf);
 }
 
