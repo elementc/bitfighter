@@ -11,8 +11,10 @@
       div.emscripten { text-align: center; }
       div.emscripten_border { border: 1px solid black; }
       /* the canvas *must not* have any border or padding, or mouse coords will be wrong */
-      canvas.emscripten { border: 0px none; background-color: black; display: block; margin: 0 auto; }
+      canvas.emscripten { border: 0px none; background-color: black; display: block; width: 100%; height: calc(100vh - 11rem); }
       p.hint { text-align: center; font-size: 14px; margin: 8px; }
+      #toolbar { display: flex; gap: 12px; align-items: center; justify-content: center; padding: 6px 10px; background: #1b1b1b; }
+      #toolbar button { background: #163; color: #efe; border: 1px solid #3a6; padding: 6px 14px; font: inherit; cursor: pointer; }
 
       .spinner {
         height: 50px;
@@ -38,7 +40,10 @@
     <div class="emscripten">
       <progress value="0" max="100" id="progress" hidden=1></progress>
     </div>
-    <p class="hint">Click HOST GAME, then START HOSTING. WASD moves, mouse aims and fires, Esc opens the menu. H is in-game help.</p>
+    <div id="toolbar">
+      <button id="fullscreen" type="button">Fullscreen</button>
+      <span class="hint">Click HOST GAME, then START HOSTING. Add ?relay=ws://host:port to reach a UDP relay. H is in-game help.</span>
+    </div>
     <div class="emscripten_border">
       <canvas class="emscripten" id="canvas" width="1280" height="720" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
     </div>
@@ -50,6 +55,14 @@
       var canvasElement = document.getElementById('canvas');
       var outputElement = document.getElementById('output');
       if (outputElement) outputElement.value = ''; // clear browser cache
+
+      document.getElementById('fullscreen').addEventListener('click', function () {
+        var target = document.getElementById('canvas');
+        if (target.requestFullscreen)
+          target.requestFullscreen();
+        else if (target.webkitRequestFullscreen)
+          target.webkitRequestFullscreen();
+      });
 
       canvasElement.addEventListener("webglcontextlost", (e) => {
         alert('WebGL context lost. You will need to reload the page.');

@@ -51,6 +51,8 @@ Open `http://127.0.0.1:8080/bitfighter.html`.
 
 A copy of this build is published from the `emscripten-poc` branch by `.github/workflows/emscripten-pages.yml` to <https://elementc.github.io/bitfighter/>. That workflow runs only on pushes to `emscripten-poc` (and when started by hand).
 
+The page has a **Fullscreen** button. The in-game display-mode control calls `SDL_SetWindowFullscreen`, and SDL's Emscripten backend turns that into `emscripten_request_fullscreen_strategy`. The browser only accepts either request from a click or a key. The canvas CSS is `width: 100%` and a height that fills the space under the toolbar, so the picture tracks the window.
+
 ## UDP relay
 
 Browsers cannot open raw UDP sockets. Emscripten's `websocket_to_posix_proxy` (`-sPROXY_POSIX_SOCKETS`) does bridge POSIX sockets, but it waits on a futex and needs pthreads plus `SharedArrayBuffer`. GitHub Pages does not send the cross-origin isolation headers that requires, and that mode also fights `emscripten_set_main_loop`. The browser build therefore uses a small relay, `tools/udp-ws-relay/relay.py`.
