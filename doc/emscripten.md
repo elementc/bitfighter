@@ -2,7 +2,7 @@
 
 This is a minimal WebAssembly build of the Bitfighter client. Native Linux, Windows, and macOS builds are unchanged: every difference is behind `if(EMSCRIPTEN)` or `#ifdef __EMSCRIPTEN__`.
 
-It loads the main menu, plays sound, and can host a local game (the client and server in the same page talk through `NetConnection::connectLocal`, not UDP). With the default relay it also talks to the master server and to game servers whose UDP port is 28000.
+It loads the main menu, plays sound, and can host a local game (the client and server in the same page talk through `NetConnection::connectLocal`, not UDP). With the default relay it also talks to the master server and to game servers the master has named, on any port.
 
 ## What you need
 
@@ -59,7 +59,7 @@ Browsers cannot open raw UDP sockets. Emscripten's `websocket_to_posix_proxy` (`
 
 One WebSocket carries every datagram. Each browser socket is a real UDP socket on the relay. The game code changes only `Socket` send/receive. With the relay disabled, sockets stay on the failing POSIX path and a local game still uses `connectLocal`.
 
-The browser build connects to `wss://bitfighter-relay.onrender.com` unless told otherwise. That host is a free Render service: it allowlists UDP ports 25955 and 28000, and it sleeps after about 15 minutes idle. The page opens a throwaway WebSocket as soon as the HTML runs, so a cold start (about a minute) overlaps the wasm download. The game then opens its own socket and retries that for 90 seconds. `?relay=wss://other.example/` or `?relay=ws://127.0.0.1:28080` replaces the default. `?relay=`, `?relay=off`, or `?relay=0` disables it. `Module.relay` is only used when the query parameter is absent.
+The browser build connects to `wss://bitfighter-relay.onrender.com` unless told otherwise. That host is a free Render service: it always allows UDP ports 25955 and 28000, and for ten minutes it also allows addresses the master named for that browser. It sleeps after about 15 minutes idle. The page opens a throwaway WebSocket as soon as the HTML runs, so a cold start (about a minute) overlaps the wasm download. The game then opens its own socket and retries that for 90 seconds. `?relay=wss://other.example/` or `?relay=ws://127.0.0.1:28080` replaces the default. `?relay=`, `?relay=off`, or `?relay=0` disables it. `Module.relay` is only used when the query parameter is absent.
 
 The browser's master list is `IP:107.172.71.173:25955` first. Hostnames are not resolved, and a rejected hostname does not spend the 10 second master retry when another entry remains. JOIN's "gave up on the master" clock starts when the relay socket opens, not when the game starts, and is still 8 seconds after that. Native builds keep the hostname-first list and the original clock.
 
@@ -69,7 +69,7 @@ python3 tools/udp-ws-relay/relay.py 28080
 
 A local relay is `http://127.0.0.1:8080/bitfighter.html?relay=ws://127.0.0.1:28080`. `?master=host:port` replaces the master list (a LAN test passes a name that does not resolve, so the page never opens a public connection). The hosted page is HTTPS, so a relay it can reach has to be `wss://`. An open `ws://` URL from that page is mixed content and the browser blocks it.
 
-`.github/workflows/emscripten-pages.yml` runs that LAN path on every push: native `bitfighterd` on `127.0.0.1:28000` with `-serverpassword` and `-master IP:127.0.0.1:9`, `relay.py` on port 28080, and headless Chromium. The test types a wrong password (the client logs `Server requires a password` again and the server does not record a join), then the real password, and requires `WebPilot [...] joined` in `bitfighter_server.log`. The Pages deploy does not wait on this job.
+`.github/workflows/emscripten-pages.yml` runs that LAN path on every push: native `bitfighterd` on `127.0.0.1:28123` with `-serverpassword` and `-master IP:127.0.0.1:9`, `relay.py` on port 28080, and headless Chromium. A datagram from port 25955 names that address before the client connects. The test types a wrong password (the client logs `Server requires a password` again and the server does not record a join), then the real password, and requires `WebPilot [...] joined` in `bitfighter_server.log`. `test_relay.py` also checks that a port the master did not name is dropped. The Pages deploy does not wait on this job.
 
 Outbound destination ports default to `25955` (master) and `28000` (game). Override with `RELAY_ALLOW_PORTS=25955,28000,28001` or `RELAY_ALLOW_ANY=1`. The default allowlist is intentional: without it the process is an open UDP proxy. Do not put an unrestricted relay on the public internet.
 
@@ -84,9 +84,11 @@ What the relay host needs:
 - Outbound UDP, and a NAT that accepts the replies to those sockets. Client-to-server play only needs that.
 - For other people to send *to* the browser (the browser hosting a public game, or an arranged peer connection), the relay's UDP ports have to be reachable from the internet. `--network host` is the straightforward way.
 
-What works: the client talks to the real master at `107.172.71.173:25955` (the hostname entries are skipped, because Emscripten's `getaddrinfo` returns a fake address) and joins a server on an allowed port. Tested against a private `bitfighterd` on `127.0.0.1:28000` with `-serverpassword`.
+What works: the client talks to the real master at `107.172.71.173:25955` (the hostname entries are skipped, because Emscripten's `getaddrinfo` returns a fake address) and joins a server the master named, on whatever port that listing or arranged-connection reply uses. A private `bitfighterd` on a non-28000 port is reachable once a master announcement names it. The static list still allows 25955 and 28000 with no announcement.
 
-What does not: arranged (NAT punch) connections. The master tells the client to send to the other peer's ephemeral port, and the default allowlist drops that. `RELAY_ALLOW_ANY=1` lets those packets through, on a host whose UDP ports are public. Two browsers still only see each other as the relay's address, not their own.
+The relay does not read real master RPC bodies: TNL encrypts them. After a datagram arrives from UDP port 25955, the browser tells the relay each address it decoded (`ALLOW` frame), and that address is permitted for ten minutes. A clear announcement (magic `0xbfbf`, version 1, then IP:port pairs) from port 25955 is parsed directly and limits later `ALLOW` frames to those pairs; `tools/udp-ws-relay/test_relay.py` uses that. The source of any inbound datagram is also permitted, so a punch reply can be sent back. Anything else is dropped. There is no new environment variable. `RELAY_ALLOW_ANY=1` is still an open proxy and must not be set on the public relay.
+
+What does not: two browsers still only see each other as the relay's address, not their own. A destination the master never named, and that has not written to this session, is dropped.
 
 The shell passes `-name WebPilot`, so the first screen is the main menu rather than nickname entry. Click the canvas, then:
 
@@ -111,7 +113,7 @@ Asyncify was rejected. It rewrites every function that can reach `Platform::slee
 | LuaJIT | Official Lua 5.1.5, downloaded by CMake at configure time | The vendored LuaJIT 2.0.5 generates machine code with dynasm and has no WebAssembly backend. The game's C API and scripts are Lua 5.1. The tarball is `https://www.lua.org/ftp/lua-5.1.5.tar.gz` pinned by SHA256, not copied into the git tree. |
 | Threads | `-DNO_THREADS=ON` (`TNL_NO_THREADS`) | pthreads need `SharedArrayBuffer` and cross-origin isolation headers. One-shot threads run inline. `DatabaseAccessThread` drains its queue once instead of looping forever, which would lock the tab. |
 | Master server | UDP via the WebSocket relay, numeric address first | Emscripten's `getaddrinfo` returns a fake address, so hostname entries are skipped. The numeric master is first in the browser list. JOIN waits out a cold relay before it reports a master failure. |
-| UDP to other games | WebSocket relay, ports 25955 and 28000 | Raw UDP does not exist in the browser. The default relay allowlist drops every other destination port, including arranged-connection peer ports. |
+| UDP to other games | WebSocket relay | Raw UDP does not exist in the browser. Ports 25955 and 28000 are always allowed. Other ports are allowed for ten minutes when the master named them, or when that peer has already sent a packet to the session. |
 | Audio | OpenAL (`-lopenal`) and in-tree ALURE, with the Ogg/Vorbis ports | Sound effects are wav files loaded straight into OpenAL. Menu and credits music are ogg. A click or key resumes the WebAudio context (autoplay policy). |
 | Voice chat (Speex) | `BF_NO_VOICECHAT` | There is no Speex port and no Speex sources in the tree. |
 | Tracker music (ModPlug, `.xm`) | Not decoded | No ModPlug port and no ModPlug sources. `menu.ogg` and `credits.ogg` still play. |

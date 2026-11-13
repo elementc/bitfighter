@@ -98,6 +98,9 @@ jobs:
           cmake ../.. -DCMAKE_BUILD_TYPE=Release
           cmake --build . --target bitfighterd -j"$(nproc)"
 
+      - name: Relay allowlist checks
+        run: python3 tools/udp-ws-relay/test_relay.py
+
       - name: Install Playwright
         run: |
           npm install --prefix "${RUNNER_TEMP}/bf-lan" playwright@1.65.0

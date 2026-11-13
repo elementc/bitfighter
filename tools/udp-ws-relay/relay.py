@@ -33,10 +33,25 @@ Frame layout, big-endian, one WebSocket binary message per frame:
     u16 length
     u8  payload[length]
 
-Outbound destination ports are restricted. The default is the master-server
-port and the default game port. Override with RELAY_ALLOW_PORTS=25955,28000
-or RELAY_ALLOW_ANY=1. Do not publish an unrestricted relay: it is an open
-UDP proxy.
+Outbound destinations are restricted. The static allowlist is the master
+port and the default game port (RELAY_ALLOW_PORTS, default 25955,28000).
+RELAY_ALLOW_ANY=1 turns filtering off; do not set that on a public host.
+
+A session may also send to addresses the master named, for ten minutes:
+
+  - A datagram from UDP port 25955 whose payload is a clear announcement
+    (see parse_master_announcement) adds those IP:port pairs.
+  - TNL encrypts real master RPC bodies, so the game client also sends an
+    ALLOW frame for each address it decoded. That frame is honored only
+    after this session has received a datagram from port 25955, and only
+    for addresses in a parsed announcement when one was present.
+  - The source of any inbound datagram is allowed, so a punch reply can
+    be sent back to the peer that just wrote to this session.
+
+  ALLOW client -> relay
+    u8  4
+    u32 ipv4
+    u16 port
 
 Usage:
   python3 tools/udp-ws-relay/relay.py [port]
@@ -47,11 +62,15 @@ import asyncio
 import os
 import struct
 import sys
+import time
 
 BIND = 1
 SEND = 2
 RECV = 3
+ALLOW = 4
 MAX_PAYLOAD = 8192
+MASTER_PORT = 25955
+DYNAMIC_TTL = 600.0  # seconds; a listed server stays reachable for one browse
 
 DEFAULT_PORTS = {25955, 28000}
 
@@ -68,7 +87,39 @@ def allowed_ports():
     return ports or DEFAULT_PORTS
 
 
-ALLOW = allowed_ports()
+ALLOW_PORTS = allowed_ports()
+
+
+def host_of(ip):
+    return ".".join(str((ip >> shift) & 0xFF) for shift in (24, 16, 8, 0))
+
+
+def fmt_addr(ip, port):
+    return f"{host_of(ip)}:{port}"
+
+
+def parse_master_announcement(data):
+    """Clear announcement a test (or a future clear reply) can send.
+
+    Layout, big-endian: u16 0xbfbf, u8 version 1, u16 count,
+    then count times (u32 ipv4, u16 port). Real master RPCs are
+    encrypted and do not match this, so they are ignored here.
+    """
+    if len(data) < 5 or data[0] != 0xBF or data[1] != 0xBF or data[2] != 1:
+        return []
+    count = struct.unpack("!H", data[3:5])[0]
+    need = 5 + count * 6
+    # Exact length, so an encrypted master datagram cannot accidentally match.
+    if count > 64 or count < 1 or len(data) != need:
+        return []
+    found = []
+    off = 5
+    for _ in range(count):
+        ip, port = struct.unpack("!IH", data[off:off + 6])
+        off += 6
+        if ip and port:
+            found.append((ip, port))
+    return found
 
 
 def ws_accept(key: str) -> str:
@@ -83,7 +134,10 @@ class Client:
     def __init__(self, reader, writer):
         self.reader = reader
         self.writer = writer
-        self.socks = {}  # sock_id -> (transport, protocol)
+        self.socks = {}  # sock_id -> transport
+        self.dynamic = {}  # (ip, port) -> monotonic expiry
+        self.saw_master = False
+        self.master_named = set()
 
     def send_frame(self, payload: bytes):
         n = len(payload)
@@ -125,15 +179,72 @@ class Client:
         return opcode, bytes(data)
 
 
+def remember(client, ip, port, reason):
+    if not ip or not port:
+        return
+    key = (ip, port)
+    now = time.monotonic()
+    fresh = client.dynamic.get(key, 0) <= now
+    client.dynamic[key] = now + DYNAMIC_TTL
+    if fresh:
+        print(f"allow {fmt_addr(ip, port)} ({reason})", flush=True)
+
+
+def destination_allowed(client, ip, port):
+    if ALLOW_PORTS is None:
+        return True
+    if port in ALLOW_PORTS:
+        return True
+    exp = client.dynamic.get((ip, port))
+    if exp is None:
+        return False
+    if exp <= time.monotonic():
+        del client.dynamic[(ip, port)]
+        return False
+    return True
+
+
+def note_from_master(client, data):
+    client.saw_master = True
+    named = parse_master_announcement(data)
+    for ip, port in named:
+        client.master_named.add((ip, port))
+        remember(client, ip, port, "master announcement")
+
+
+def note_inbound(client, ip, port, data):
+    # A peer that already wrote to this session can be answered (NAT punch).
+    remember(client, ip, port, "inbound source")
+    if port == MASTER_PORT:
+        note_from_master(client, data)
+
+
+def honor_allow(client, ip, port):
+    key = (ip, port)
+    if key in client.master_named:
+        remember(client, ip, port, "client confirm of master announcement")
+        return
+    if client.master_named:
+        print(f"drop allow {fmt_addr(ip, port)} (not in this session's master announcement)", flush=True)
+        return
+    if not client.saw_master:
+        print(f"drop allow {fmt_addr(ip, port)} (no master traffic this session)", flush=True)
+        return
+    # Real master RPC bodies are encrypted, so the decoded address arrives
+    # from the game client. The session still had to hear the master first.
+    remember(client, ip, port, "client report after master traffic")
+
+
 class UDP(asyncio.DatagramProtocol):
     def __init__(self, client, sock_id):
         self.client = client
         self.sock_id = sock_id
 
     def datagram_received(self, data, addr):
-        ip = struct.unpack("!I", bytes(map(int, addr[0].split("."))))[0] if ":" not in addr[0] else 0
         if ":" in addr[0]:
             return  # IPv6 replies are not part of this PoC
+        ip = struct.unpack("!I", bytes(map(int, addr[0].split("."))))[0]
+        note_inbound(self.client, ip, addr[1], data)
         frame = struct.pack("!BIIHH", RECV, self.sock_id, ip, addr[1], len(data)) + data
         try:
             self.client.send_frame(frame)
@@ -169,15 +280,17 @@ async def handle_message(client, payload):
     elif kind == SEND and len(payload) >= 13:
         sock_id, ip, port, length = struct.unpack("!IIHH", payload[1:13])
         data = payload[13:13 + length]
-        if ALLOW is not None and port not in ALLOW:
-            print(f"drop send to port {port} (not in RELAY_ALLOW_PORTS)", flush=True)
+        if not destination_allowed(client, ip, port):
+            print(f"drop send to {fmt_addr(ip, port)} (not allowed)", flush=True)
             return
         transport = client.socks.get(sock_id)
         if transport is None or len(data) != length:
             return
-        host = ".".join(str((ip >> shift) & 0xFF) for shift in (24, 16, 8, 0))
-        print(f"send sock={sock_id} {host}:{port} {len(data)} bytes", flush=True)
-        transport.sendto(data, (host, port))
+        print(f"send sock={sock_id} {fmt_addr(ip, port)} {len(data)} bytes", flush=True)
+        transport.sendto(data, (host_of(ip), port))
+    elif kind == ALLOW and len(payload) >= 7:
+        ip, port = struct.unpack("!IH", payload[1:7])
+        honor_allow(client, ip, port)
 
 
 async def connection(reader, writer):
@@ -238,7 +351,7 @@ async def connection(reader, writer):
 async def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 28080
     server = await asyncio.start_server(connection, "0.0.0.0", port)
-    ports = "any" if ALLOW is None else ",".join(str(p) for p in sorted(ALLOW))
+    ports = "any" if ALLOW_PORTS is None else ",".join(str(p) for p in sorted(ALLOW_PORTS))
     print(f"udp-ws-relay listening on ws://0.0.0.0:{port}/  allow_ports={ports}", flush=True)
     async with server:
         await server.serve_forever()

@@ -20,6 +20,7 @@ namespace
 const uint8_t BIND = 1;
 const uint8_t SEND = 2;
 const uint8_t RECV = 3;
+const uint8_t ALLOW = 4;
 const S32 MAX_PAYLOAD = 8192;
 
 struct Packet
@@ -292,6 +293,18 @@ U32 TNL::emscriptenRelayMasterWaitMs(U32 gameUnconnectedMs)
    // gameUnconnectedMs is 0 while the master connection is up, and it restarts
    // if that connection drops. Don't let a long-open socket replace either.
    return gameUnconnectedMs < sinceOpen ? gameUnconnectedMs : sinceOpen;
+}
+
+void TNL::emscriptenRelayAllow(U32 ip, U16 port)
+{
+   if(!ip || !port || !emscriptenRelayEnabled())
+      return;
+   ensureSocket();
+   std::vector<U8> frame(7);
+   frame[0] = ALLOW;
+   writeU32(&frame[1], ip);
+   writeU16(&frame[5], port);
+   sendFrame(frame);
 }
 
 bool TNL::emscriptenRelayEnabled()

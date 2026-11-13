@@ -13,6 +13,7 @@
 //                    not installed next to this script
 
 import { spawn } from 'node:child_process';
+import dgram from 'node:dgram';
 import { createWriteStream, mkdirSync, readFileSync, symlinkSync, rmSync, readdirSync, existsSync, cpSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import net from 'node:net';
@@ -28,6 +29,7 @@ const screenshotPath = process.env.BF_SCREENSHOT || path.join(root, 'lan-join.pn
 const logDir = process.env.BF_LOG_DIR || path.join(root, 'lan-logs');
 const httpPort = Number(process.env.BF_HTTP_PORT || 8091);
 const relayPort = 28080;
+const gamePort = 28123;
 const password = 'lan-secret';
 const wrongPassword = 'not-the-password';
 
@@ -51,6 +53,35 @@ function stopAll() {
     if (child.exitCode === null && child.signalCode === null)
       child.kill('SIGTERM');
   }
+}
+
+function relayBoundPort() {
+  const text = readText(path.join(logDir, 'relay.out'));
+  const found = [...text.matchAll(/actual=(\d+)/g)];
+  return found.length ? Number(found[found.length - 1][1]) : 0;
+}
+
+// Tell the relay the master named this host:port. Source port 25955 is what
+// the relay treats as the master. The payload is the clear announcement.
+function announceGamePort(boundPort) {
+  return new Promise((resolve, reject) => {
+    const sock = dgram.createSocket('udp4');
+    const payload = Buffer.alloc(11);
+    payload.writeUInt8(0xbf, 0);
+    payload.writeUInt8(0xbf, 1);
+    payload.writeUInt8(1, 2);
+    payload.writeUInt16BE(1, 3);
+    payload.writeUInt32BE(0x7f000001, 5);
+    payload.writeUInt16BE(gamePort, 9);
+    sock.once('error', reject);
+    sock.bind(25955, '127.0.0.1', () => {
+      sock.send(payload, boundPort, '127.0.0.1', (err) => {
+        sock.close();
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  });
 }
 
 function portOpen(port) {
@@ -112,7 +143,7 @@ try {
     '-dedicated',
     '-rootdatadir', dataDir,
     '-serverpassword', password,
-    '-hostaddr', 'IP:127.0.0.1:28000',
+    '-hostaddr', 'IP:127.0.0.1:' + gamePort,
     '-master', 'IP:127.0.0.1:9',
     '-hostname', 'LanTest',
   ], 'bitfighterd.out');
@@ -167,7 +198,10 @@ try {
     await delay(400);
     return (await output.inputValue()).includes('Server browser');
   }, 20000);
-  await page.keyboard.type('/connect IP:127.0.0.1:28000', { delay: 20 });
+  await waitFor('relay socket', () => relayBoundPort() > 0, 10000);
+  await announceGamePort(relayBoundPort());
+  await delay(200);
+  await page.keyboard.type('/connect IP:127.0.0.1:' + gamePort, { delay: 20 });
   await page.keyboard.press('Enter');
 
   async function passwordPrompts() {

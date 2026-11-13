@@ -25,6 +25,9 @@
 
 #include "Colors.h"
 #include "stringUtils.h"
+#ifdef __EMSCRIPTEN__
+#include "emscriptenSocket.h"
+#endif
 
 #include <sys/stat.h>
 #include <cmath>
@@ -876,6 +879,10 @@ void ClientGame::idle(U32 timeDelta)
 
 void ClientGame::gotServerListFromMaster(const Vector<ServerAddr> &serverList)
 {
+#ifdef __EMSCRIPTEN__
+   for(S32 i = 0; i < serverList.size(); i++)
+      TNL::emscriptenRelayAllow(serverList[i].ipAddress.netNum, serverList[i].ipAddress.port);
+#endif
    getUIManager()->gotServerListFromMaster(serverList);
 }
 

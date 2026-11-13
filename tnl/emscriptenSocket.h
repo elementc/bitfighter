@@ -22,6 +22,10 @@ void emscriptenRelayClose(S32 fd);
 bool emscriptenRelayOwns(S32 fd);
 NetError emscriptenRelaySendTo(S32 fd, const Address &address, const U8 *buffer, S32 bufferSize);
 NetError emscriptenRelayRecvFrom(S32 fd, Address *address, U8 *buffer, S32 bufferSize, S32 *outSize);
+// Ask the relay to permit this destination. Honored only after the session
+// has heard the master, and only for addresses a parsed master announcement
+// named when one is present. No effect when the relay is disabled.
+void emscriptenRelayAllow(U32 ip, U16 port);
 
 }
 
