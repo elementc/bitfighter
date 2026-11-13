@@ -92,13 +92,21 @@
         statusElement.innerHTML = text;
       }
 
+      // Skip the nickname screen. ?master= replaces the master list so a LAN
+      // test can point at an address that will never be contacted.
+      var gameArgs = ['-name', 'WebPilot'];
+      try {
+        var master = new URLSearchParams(window.location.search).get('master');
+        if (master)
+          gameArgs.push('-master', master);
+      } catch (e) {}
+
 #if MODULARIZE && !EXPORT_ES6
       var moduleArgs = {
 #else
       var Module = {
 #endif
-        // Skip the nickname screen. Delete this to see name entry instead.
-        arguments: ['-name', 'WebPilot'],
+        arguments: gameArgs,
         print(...args) {
           console.log(...args);
           if (outputElement) {

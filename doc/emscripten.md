@@ -65,7 +65,9 @@ The browser build connects to `wss://bitfighter-relay.onrender.com` unless told 
 python3 tools/udp-ws-relay/relay.py 28080
 ```
 
-A local relay is `http://127.0.0.1:8080/bitfighter.html?relay=ws://127.0.0.1:28080`. The hosted page is HTTPS, so a relay it can reach has to be `wss://`. An open `ws://` URL from that page is mixed content and the browser blocks it.
+A local relay is `http://127.0.0.1:8080/bitfighter.html?relay=ws://127.0.0.1:28080`. `?master=host:port` replaces the master list (a LAN test passes a name that does not resolve, so the page never opens a public connection). The hosted page is HTTPS, so a relay it can reach has to be `wss://`. An open `ws://` URL from that page is mixed content and the browser blocks it.
+
+`.github/workflows/emscripten-pages.yml` runs that LAN path on every push: native `bitfighterd` on `127.0.0.1:28000` with `-serverpassword` and `-master IP:127.0.0.1:9`, `relay.py` on port 28080, and headless Chromium. The test types a wrong password (the client logs `Server requires a password` again and the server does not record a join), then the real password, and requires `WebPilot [...] joined` in `bitfighter_server.log`. The Pages deploy does not wait on this job.
 
 Outbound destination ports default to `25955` (master) and `28000` (game). Override with `RELAY_ALLOW_PORTS=25955,28000,28001` or `RELAY_ALLOW_ANY=1`. The default allowlist is intentional: without it the process is an open UDP proxy. Do not put an unrestricted relay on the public internet.
 

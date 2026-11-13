@@ -54,6 +54,65 @@ jobs:
         with:
           path: site
 
+      # The LAN job downloads this. deploy does not wait on that job.
+      - name: Upload wasm site
+        uses: actions/upload-artifact@v4
+        with:
+          name: emscripten-site
+          path: site
+          retention-days: 1
+
+  # Passworded bitfighterd on localhost, through relay.py. A failure here
+  # does not block the Pages deploy.
+  lan-test:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download wasm site
+        uses: actions/download-artifact@v4
+        with:
+          name: emscripten-site
+          path: site
+
+      - name: Install native build dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake libphysfs-dev libsdl2-dev libopenal-dev libvorbis-dev libmodplug-dev libspeex-dev libpng-dev libtomcrypt-dev libtommath-dev
+
+      - name: Build bitfighterd
+        run: |
+          mkdir -p build/linux
+          cd build/linux
+          cmake ../.. -DCMAKE_BUILD_TYPE=Release
+          cmake --build . --target bitfighterd -j"$(nproc)"
+
+      - name: Install Playwright
+        run: |
+          npm install --prefix "${RUNNER_TEMP}/bf-lan" playwright@1.55.1
+          cd "${RUNNER_TEMP}/bf-lan"
+          npx playwright install --with-deps chromium
+
+      - name: Join a passworded LAN server
+        env:
+          BF_SITE: site
+          BF_SCREENSHOT: lan-join.png
+          BF_LOG_DIR: lan-logs
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/bf-lan/node_modules/playwright/index.mjs
+        run: node tools/udp-ws-relay/lan-join-test.mjs
+
+      - name: Upload join screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lan-join
+          path: |
+            lan-join.png
+            lan-logs/
+          retention-days: 14
+          if-no-files-found: ignore
+
   deploy:
     needs: build
     runs-on: ubuntu-latest
