@@ -54,6 +54,12 @@ bool VideoSystem::init()
 {
    // Make sure "SDL_Init(0)" was done before calling this function
 
+#ifdef __EMSCRIPTEN__
+   // Route keyboard input to the page canvas. Emscripten's event target
+   // lookup treats this as a CSS selector.
+   SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas");
+#endif
+
    // First, initialize SDL's video subsystem
    if (SDL_InitSubSystem(SDL_INIT_VIDEO) < 0)
    {
@@ -71,7 +77,12 @@ bool VideoSystem::init()
    //SDL_GL_SetAttribute( SDL_GL_BLUE_SIZE, 8 );
    //SDL_GL_SetAttribute( SDL_GL_ALPHA_SIZE, 8 );
 
-#ifndef BF_USE_LEGACY_GL
+#ifdef __EMSCRIPTEN__
+   // WebGL is OpenGL ES 2.0. A desktop 2.1 context request does not map.
+   SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#elif !defined(BF_USE_LEGACY_GL)
    // Tell SDL which OpenGL version we will use
    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, BF_GL_MAJOR_VERSION);
    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, BF_GL_MINOR_VERSION);
@@ -87,6 +98,15 @@ bool VideoSystem::init()
    SDL_DisplayMode mode;
 
    SDL_GetCurrentDisplayMode(0, &mode);  // We only have one display..  for now
+
+#ifdef __EMSCRIPTEN__
+   // Some canvases report 0 (or the 300x150 default) before layout.
+   if(mode.w < 640 || mode.h < 480)
+   {
+      mode.w = 1280;
+      mode.h = 720;
+   }
+#endif
 
    DisplayManager::getScreenInfo()->init(mode.w, mode.h);
 

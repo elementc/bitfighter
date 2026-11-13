@@ -1041,6 +1041,13 @@ void Game::setGameTime(F32 timeInMinutes)
 // Called from both clientGame and serverGame idle functions, so think of this as a kind of idle
 void Game::checkConnectionToMaster(U32 timeDelta)
 {
+#ifdef __EMSCRIPTEN__
+   // The master server speaks raw UDP. The browser socket layer is WebSocket
+   // only, and a hostname lookup from the main thread cannot block on DNS.
+   // Local games use NetConnection::connectLocal and do not need this.
+   (void)timeDelta;
+   return;
+#endif
    if(mConnectionToMaster.isValid() && mConnectionToMaster->isEstablished())
       mTimeUnconnectedToMaster = 0;
    else if(mReadyToConnectToMaster)
@@ -1102,6 +1109,10 @@ void Game::checkConnectionToMaster(U32 timeDelta)
 
 void Game::processAnonymousMasterConnection()
 {
+#ifdef __EMSCRIPTEN__
+   // See checkConnectionToMaster(). No master server from the browser.
+   return;
+#endif
    // Connection doesn't exist yet
    if(!mAnonymousMasterServerConnection.isValid())
       return;

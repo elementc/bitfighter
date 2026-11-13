@@ -177,7 +177,10 @@ string getInstalledDataDir()
 {
    string path;
 
-#if defined(TNL_OS_LINUX)
+#if defined(__EMSCRIPTEN__)
+   path = getExecutableDir();
+
+#elif defined(TNL_OS_LINUX)
    // In Linux, the data dir can be anywhere!  Usually in something like /usr/share/bitfighter
    // or /usr/local/share/bitfighter.  Ignore if compiling DEBUG
 #if defined(LINUX_DATA_DIR) && !defined(TNL_DEBUG)

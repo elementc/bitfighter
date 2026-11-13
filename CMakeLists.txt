@@ -17,6 +17,18 @@ option(NO_THREADS "Disable usage of threads in TNL.  May cause issues." NO)
 option(LUAJIT_BUILTIN "Use built-in LuaJIT.  Recommended." YES)
 option(DISCORD "Integrate Discord RPC calls." YES)
 
+# Browser limitations. Native builds leave the options above alone.
+if(EMSCRIPTEN)
+	# LuaJIT's interpreter is generated machine code. There is no wasm backend
+	# in the vendored tree, so the Emscripten build uses PUC Lua 5.1 instead.
+	set(LUAJIT_BUILTIN OFF)
+	# pthreads need SharedArrayBuffer and cross-origin isolation. The PoC runs
+	# TNL threads inline (see TNL_NO_THREADS).
+	set(NO_THREADS ON)
+	# Discord's RPC socket has no browser transport.
+	set(DISCORD OFF)
+endif()
+
 
 #
 # CMake system management
@@ -35,8 +47,12 @@ if(MSVC)
     add_compile_definitions(_HAS_STD_BYTE=0)
 endif()
 
-# Use appropriate platform alterations
-if(WIN32)
+# Use appropriate platform alterations.
+# EMSCRIPTEN is also UNIX, so it has to be tested first. Linux.cmake's
+# --as-needed link flag is rejected by wasm-ld.
+if(EMSCRIPTEN)
+	include(${CMAKE_SOURCE_DIR}/cmake/Platform/Emscripten.cmake)
+elseif(WIN32)
 	include(${CMAKE_SOURCE_DIR}/cmake/Platform/Win32.cmake)
 elseif(APPLE)
 	include(${CMAKE_SOURCE_DIR}/cmake/Platform/Apple.cmake)
@@ -63,17 +79,31 @@ endif()
 # Library searching and dependencies
 #
 
-# SDL2 is default and should be found on all platforms except possibly Linux
-find_package(SDL2)
+# SDL2 is default and should be found on all platforms except possibly Linux.
+# Emscripten supplies it as a port (-sUSE_SDL=2), not as a CMake package.
+if(EMSCRIPTEN)
+	set(SDL2_FOUND TRUE)
+	set(SDL_INCLUDE_DIR "")
+	set(SDL_LIBRARY "")
+else()
+	find_package(SDL2)
 
-if(SDL2_FOUND)
-	set(SDL_INCLUDE_DIR ${SDL2_INCLUDE_DIR})
-	set(SDL_LIBRARY ${SDL2_LIBRARY})
+	if(SDL2_FOUND)
+		set(SDL_INCLUDE_DIR ${SDL2_INCLUDE_DIR})
+		set(SDL_LIBRARY ${SDL2_LIBRARY})
+	endif()
 endif()
 
 # Searches for OpenGL and enables GLES if GL isn't found in the system
 message(STATUS "Determining system GL provider")
-if(NOT USE_GLES)
+if(EMSCRIPTEN)
+	# WebGL is OpenGL ES 2.0, linked by -sFULL_ES2=1. There is no host libGL.
+	message(STATUS "Using Emscripten WebGL (OpenGL ES 2.0)")
+	set(USE_GLES 1)
+	add_definitions(-DBF_USE_GLES)
+	set(GL_LIBRARY "")
+	set(GL_INCLUDE_DIR "")
+elseif(NOT USE_GLES)
 	message(STATUS "Attempting to use standard OpenGL")
 	find_package(OpenGL)
 	set(USE_STANDARD_GL 1)
@@ -81,7 +111,7 @@ if(NOT USE_GLES)
 	set(GL_INCLUDE_DIR ${OPENGL_INCLUDE_DIR})
 endif()
 
-if(USE_GLES OR NOT USE_STANDARD_GL)
+if(NOT EMSCRIPTEN AND (USE_GLES OR NOT USE_STANDARD_GL))
 	message(STATUS "Attempting to use OpenGL ES")
 	add_definitions(-DBF_USE_GLES)
 	add_definitions(-DBF_NO_CONSOLE)
@@ -140,17 +170,41 @@ endfunction()
 
 
 # ALURE
-find_with_fallback(ALURE ALURE alure)
-if(NOT ALURE_FOUND)
-	if(NOT OPENAL_FOUND)
-		message(WARNING "OpenAL not found.  Bitfighter will be compiled without audio")
-		add_definitions(-DBF_NO_AUDIO)
-		set(OPENAL_INCLUDE_DIR "")
-	else()
-		message(STATUS "Using in-tree ALURE")
-		add_subdirectory(alure)
-		set(ALURE_LIBRARIES alure)
-		set(ALURE_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/alure/include")
+if(EMSCRIPTEN)
+	# OpenAL, ALURE, Vorbis, ModPlug, and Speex are not wired to Emscripten
+	# ports. The existing BF_NO_AUDIO stubs (also used by the dedicated server)
+	# keep the client linking. libpng still comes from -sUSE_LIBPNG.
+	message(STATUS "Emscripten build: audio disabled (BF_NO_AUDIO)")
+	add_definitions(-DBF_NO_AUDIO)
+	set(OPENAL_FOUND FALSE)
+	# TRUE so zap/bitfighter_client.cmake does not depend on an alure target
+	# we are not building. ALURE_LIBRARIES stays empty.
+	set(ALURE_FOUND TRUE)
+	set(OPENAL_INCLUDE_DIR "")
+	set(OPENAL_LIBRARY "")
+	set(ALURE_LIBRARIES "")
+	set(ALURE_INCLUDE_DIR "")
+	set(SPEEX_INCLUDE_DIR "")
+	set(SPEEX_LIBRARIES "")
+	set(OGG_LIBRARIES "")
+	set(VORBIS_LIBRARIES "")
+	set(VORBISFILE_LIBRARIES "")
+	set(MODPLUG_LIBRARIES "")
+	set(PNG_INCLUDE_DIR "")
+	set(PNG_LIBRARY "")
+else()
+	find_with_fallback(ALURE ALURE alure)
+	if(NOT ALURE_FOUND)
+		if(NOT OPENAL_FOUND)
+			message(WARNING "OpenAL not found.  Bitfighter will be compiled without audio")
+			add_definitions(-DBF_NO_AUDIO)
+			set(OPENAL_INCLUDE_DIR "")
+		else()
+			message(STATUS "Using in-tree ALURE")
+			add_subdirectory(alure)
+			set(ALURE_LIBRARIES alure)
+			set(ALURE_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/alure/include")
+		endif()
 	endif()
 endif()
 
@@ -227,22 +281,29 @@ if(APPLE AND LUAJIT_BUILTIN AND "arm64" IN_LIST CMAKE_OSX_ARCHITECTURES)
 		"    cmake .. -DLUAJIT_BUILTIN=NO")
 endif()
 
-if(NOT LUAJIT_BUILTIN)
-find_with_fallback(LuaJit LUAJIT lua)
-endif()
-
-if(LUAJIT_FOUND)
-	set(LUA_LIB ${LUAJIT_LIBRARIES})
-	set(LUA_INCLUDE_DIR ${LUAJIT_INCLUDE_DIR})
+if(EMSCRIPTEN)
+	message(STATUS "Using in-tree Lua 5.1 (LuaJIT has no WebAssembly backend)")
+	set(LUA_LIB lua)
+	set(LUA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/lua/lua51/src")
+	add_subdirectory(lua/lua51)
 else()
-	message(STATUS "Using in-tree LuaJIT")
-	# Use internal LuaJIT
-	set(LUA_LIB luajit)
-	set(LUA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/lua/luajit/src")
-endif()
+	if(NOT LUAJIT_BUILTIN)
+	find_with_fallback(LuaJit LUAJIT lua)
+	endif()
 
-if(EXISTS "${CMAKE_SOURCE_DIR}/lua/${LUA_LIB}")
-	add_subdirectory("${CMAKE_SOURCE_DIR}/lua/${LUA_LIB}")
+	if(LUAJIT_FOUND)
+		set(LUA_LIB ${LUAJIT_LIBRARIES})
+		set(LUA_INCLUDE_DIR ${LUAJIT_INCLUDE_DIR})
+	else()
+		message(STATUS "Using in-tree LuaJIT")
+		# Use internal LuaJIT
+		set(LUA_LIB luajit)
+		set(LUA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/lua/luajit/src")
+	endif()
+
+	if(EXISTS "${CMAKE_SOURCE_DIR}/lua/${LUA_LIB}")
+		add_subdirectory("${CMAKE_SOURCE_DIR}/lua/${LUA_LIB}")
+	endif()
 endif()
 
 # Discord
@@ -262,8 +323,10 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/mysql++")
 endif()
 
 
-# gtest is for compiling the bitfighter_test suite
-if(EXISTS "${CMAKE_SOURCE_DIR}/gtest")
+# gtest is for compiling the bitfighter_test suite.
+# Skip it on Emscripten; the suite is a native target and gtest's pthreads
+# setup fights the single-threaded browser build.
+if(EXISTS "${CMAKE_SOURCE_DIR}/gtest" AND NOT EMSCRIPTEN)
 	add_subdirectory(gtest EXCLUDE_FROM_ALL)
 endif()
 
