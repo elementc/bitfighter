@@ -71,7 +71,7 @@ Asyncify was rejected. It rewrites every function that can reach `Platform::slee
 
 | Piece | What the browser build does | Why |
 | --- | --- | --- |
-| LuaJIT | PUC Lua 5.1.5 (`lua/lua51/`) | The vendored LuaJIT 2.0.5 generates machine code with dynasm. It has no WebAssembly backend. The game's C API and scripts are Lua 5.1, so bots and levelgens still run. |
+| LuaJIT | Official Lua 5.1.5, downloaded by CMake at configure time | The vendored LuaJIT 2.0.5 generates machine code with dynasm and has no WebAssembly backend. The game's C API and scripts are Lua 5.1. The tarball is `https://www.lua.org/ftp/lua-5.1.5.tar.gz` pinned by SHA256, not copied into the git tree. |
 | Threads | `-DNO_THREADS=ON` (`TNL_NO_THREADS`) | pthreads need `SharedArrayBuffer` and cross-origin isolation headers. One-shot threads run inline. `DatabaseAccessThread` drains its queue once instead of looping forever, which would lock the tab. |
 | Master server | `Game::checkConnectionToMaster` returns immediately | The master protocol is raw UDP. Browser sockets are WebSockets, and a hostname lookup cannot block the main thread. |
 | UDP / internet play | Not implemented | `connectLocal` covers a self-hosted game. Real UDP does not exist in the browser. Emscripten's socket layer can open a datagram socket, but it is a WebSocket stand-in, not a peer. |

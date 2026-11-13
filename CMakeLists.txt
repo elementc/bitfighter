@@ -282,10 +282,29 @@ if(APPLE AND LUAJIT_BUILTIN AND "arm64" IN_LIST CMAKE_OSX_ARCHITECTURES)
 endif()
 
 if(EMSCRIPTEN)
-	message(STATUS "Using in-tree Lua 5.1 (LuaJIT has no WebAssembly backend)")
+	# LuaJIT has no WebAssembly backend. Fetch the official Lua 5.1.5
+	# tarball at configure time instead of vendoring it.
+	if(CMAKE_VERSION VERSION_LESS 3.14)
+		message(FATAL_ERROR "The Emscripten build downloads Lua 5.1.5 and needs CMake 3.14 or newer.")
+	endif()
+	include(FetchContent)
+	FetchContent_Declare(lua51
+		URL https://www.lua.org/ftp/lua-5.1.5.tar.gz
+		URL_HASH SHA256=2640fc56a795f29d28ef15e13c34a47e223960b0240e8cb0a82d9b0738695333
+	)
+	FetchContent_GetProperties(lua51)
+	if(NOT lua51_POPULATED)
+		FetchContent_Populate(lua51)
+	endif()
+	file(GLOB LUA51_SOURCES "${lua51_SOURCE_DIR}/src/*.c")
+	list(REMOVE_ITEM LUA51_SOURCES
+		"${lua51_SOURCE_DIR}/src/lua.c"
+		"${lua51_SOURCE_DIR}/src/luac.c")
+	add_library(lua STATIC ${LUA51_SOURCES})
+	target_include_directories(lua PUBLIC "${lua51_SOURCE_DIR}/src")
+	message(STATUS "Using fetched Lua 5.1.5 (${lua51_SOURCE_DIR})")
 	set(LUA_LIB lua)
-	set(LUA_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/lua/lua51/src")
-	add_subdirectory(lua/lua51)
+	set(LUA_INCLUDE_DIR "${lua51_SOURCE_DIR}/src")
 else()
 	if(NOT LUAJIT_BUILTIN)
 	find_with_fallback(LuaJit LUAJIT lua)
