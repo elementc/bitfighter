@@ -33,6 +33,9 @@
 #ifdef HAVE_MINIMP3
 #include "decoders/mp3.hpp"
 #endif
+#ifdef HAVE_MODPLUG
+#include "decoders/modplug.hpp"
+#endif
 
 #include "devicemanager.h"
 #include "device.h"
@@ -244,6 +247,9 @@ const DecoderEntryPair sDefaultDecoders[] = {
 #endif
 #ifdef HAVE_MINIMP3
     { "_alure_int_minimp3", alure::MakeUnique<alure::Mp3DecoderFactory>() },
+#endif
+#ifdef HAVE_MODPLUG
+    { "_alure_int_modplug", alure::MakeUnique<alure::ModPlugDecoderFactory>() },
 #endif
 };
 alure::Vector<DecoderEntryPair> sDecoders;

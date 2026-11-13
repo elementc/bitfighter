@@ -416,6 +416,51 @@ void SoundSystem::init(const string &sfxDir, const string &musicDir, float music
    gSFXValid = true;
 
 #ifdef __EMSCRIPTEN__
+   // Menu music is ogg. Game tracks are xm and use this same decoder.
+   // Read far enough to get past a silent intro and confirm samples.
+   for(S32 i = 0; i < mGameMusicList.size(); i++)
+   {
+      const string &track = mGameMusicList[i];
+      if(track.size() < 3)
+         continue;
+      string ext = track.substr(track.size() - 3);
+      if(ext != ".xm" && ext != ".XM")
+         continue;
+      try
+      {
+         string fullPath = joindir(mMusicDir, track);
+         auto decoder = mContext.createDecoder(fullPath);
+         ALuint rate = decoder ? decoder->getFrequency() : 0;
+         // Some modules are silent for the first fraction of a second.
+         // Read the same way the music buffer queue does, far enough to
+         // reach the notes, and do not seek (libmodplug's seek lands in
+         // silence on these files).
+         ALshort frames[4096 * 2];
+         ALuint got = 0;
+         S16 peak = 0;
+         for(S32 n = 0; n < 22 && decoder; n++)
+         {
+            ALuint chunk = decoder->read(frames, 4096);
+            if(!chunk)
+               break;
+            got += chunk;
+            for(ALuint s = 0; s < chunk * 2; s++)
+            {
+               S16 v = frames[s] < 0 ? (S16)-frames[s] : frames[s];
+               if(v > peak) peak = v;
+            }
+         }
+         logprintf(LogConsumer::LogConnection,
+                   "ModPlug loaded %s: %u Hz, read %u frames, peak %d",
+                   track.c_str(), rate, got, (int)peak);
+      }
+      catch(const std::exception &ex)
+      {
+         logprintf(LogConsumer::LogError, "ModPlug failed %s: %s", track.c_str(), ex.what());
+      }
+      break;
+   }
+
    // Browsers start the WebAudio context suspended until a user gesture.
    EM_ASM({
       var report = function(ctx) {

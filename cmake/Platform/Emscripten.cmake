@@ -8,7 +8,7 @@
 # line (headers) and the link line (libraries, preload, shell).
 # Ogg/Vorbis decode menu.ogg and credits.ogg. OpenAL and the websocket
 # bridge are link-only libraries, added below.
-set(EMSCRIPTEN_PORT_FLAGS "-sUSE_SDL=2 -sUSE_LIBPNG=1 -sUSE_ZLIB=1 -sUSE_OGG=1 -sUSE_VORBIS=1")
+set(EMSCRIPTEN_PORT_FLAGS "-sUSE_SDL=2 -sUSE_LIBPNG=1 -sUSE_ZLIB=1 -sUSE_OGG=1 -sUSE_VORBIS=1 -sUSE_MODPLUG=1")
 
 # C++ exceptions: Lua startup catches LuaException. Lua itself still uses
 # setjmp/longjmp, which the default SUPPORT_LONGJMP provides.

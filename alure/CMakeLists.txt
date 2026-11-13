@@ -46,6 +46,12 @@ else()
     endif()
 endif()
 
+# ModPlug: Emscripten port. Native ALURE stays as it was (no tracker decoder).
+if(EMSCRIPTEN)
+    set(HAVE_MODPLUG 1)
+    list(APPEND ALURE_SOURCES decoders/modplug.cpp)
+endif()
+
 # Opus: optional system dependency
 find_package(Opus QUIET)
 if(OPUS_FOUND)
