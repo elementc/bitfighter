@@ -63,6 +63,8 @@ The browser build connects to `wss://bitfighter-relay.onrender.com` unless told 
 
 The browser's master list is `IP:107.172.71.173:25955` first. Hostnames are not resolved, and a rejected hostname does not spend the 10 second master retry when another entry remains. JOIN's "gave up on the master" clock starts when the relay socket opens, not when the game starts, and is still 8 seconds after that. Native builds keep the hostname-first list and the original clock.
 
+The browser seeds TNL's random pool from `crypto.getRandomValues` before any nonce or player id is drawn. The old seed was the player name plus `Platform::getRealMilliseconds()`, and that clock is milliseconds since the page started. It was 0 at startup, so every reload produced the same player id and the master rejected the new session as a duplicate. Connection nonces and keys use the same pool.
+
 ```
 python3 tools/udp-ws-relay/relay.py 28080
 ```
