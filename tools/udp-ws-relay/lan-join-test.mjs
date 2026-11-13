@@ -125,9 +125,13 @@ try {
   spawnLogged('python3', ['-m', 'http.server', String(httpPort), '--bind', '127.0.0.1', '--directory', site], 'http.out');
   await waitFor('web server', () => portOpen(httpPort), 10000);
 
+  // headless: false selects Playwright's full Chromium. --headless=new then
+  // puts that binary in headless mode. The headless shell drops canvas
+  // keyboard focus, so menu shortcuts never arrive.
   browser = await chromium.launch({
-    headless: true,
+    headless: false,
     args: [
+      '--headless=new',
       '--no-sandbox',
       '--disable-dev-shm-usage',
       '--use-gl=angle',
@@ -154,9 +158,15 @@ try {
   await waitFor('client startup', async () => (await output.inputValue()).includes('Welcome to Bitfighter'), 90000);
 
   const canvas = page.locator('#canvas');
-  await canvas.click({ position: { x: 8, y: 8 } });
-  await page.keyboard.press('Enter');
-  await delay(500);
+  // J is the JOIN shortcut. The main menu may not be taking keys on the
+  // first frame, and a typed "o" on that menu opens OPTIONS, so retry J
+  // until the server browser actually logs that it opened.
+  await waitFor('server browser', async () => {
+    await canvas.focus();
+    await page.keyboard.press('j');
+    await delay(400);
+    return (await output.inputValue()).includes('Server browser');
+  }, 20000);
   await page.keyboard.type('/connect IP:127.0.0.1:28000', { delay: 20 });
   await page.keyboard.press('Enter');
 
@@ -166,7 +176,7 @@ try {
   }
 
   await waitFor('password prompt', async () => (await passwordPrompts()) >= 1, 30000);
-  await canvas.click({ position: { x: 8, y: 8 } });
+  await canvas.focus();
   await page.keyboard.type(wrongPassword, { delay: 20 });
   await page.keyboard.press('Enter');
   await waitFor('wrong password rejected', async () => (await passwordPrompts()) >= 2, 30000);
@@ -175,7 +185,7 @@ try {
   if (midway.includes('client "WebPilot" connected'))
     throw new Error('wrong password was accepted:\n' + midway);
 
-  await canvas.click({ position: { x: 8, y: 8 } });
+  await canvas.focus();
   await page.keyboard.type(password, { delay: 20 });
   await page.keyboard.press('Enter');
 

@@ -90,7 +90,7 @@ jobs:
 
       - name: Install Playwright
         run: |
-          npm install --prefix "${RUNNER_TEMP}/bf-lan" playwright@1.55.1
+          npm install --prefix "${RUNNER_TEMP}/bf-lan" playwright@1.65.0
           cd "${RUNNER_TEMP}/bf-lan"
           npx playwright install --with-deps chromium
 

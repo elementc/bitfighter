@@ -21,6 +21,8 @@
 #include "RenderUtils.h"
 #include "FontManager.h"
 
+#include "tnlLog.h"
+
 #include <math.h>
 #include <algorithm>
 
@@ -211,6 +213,7 @@ QueryServersUserInterface::~QueryServersUserInterface()
 // Initialize: Runs when "connect to server" screen is shown
 void QueryServersUserInterface::onActivate()
 {
+   logprintf(LogConsumer::LogConnection, "Server browser");
    servers.clear();     // Start fresh
    mReceivedListOfServersFromMaster = false;
    mItemSelectedWithMouse = false;
