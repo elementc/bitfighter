@@ -171,27 +171,28 @@ endfunction()
 
 # ALURE
 if(EMSCRIPTEN)
-	# OpenAL, ALURE, Vorbis, ModPlug, and Speex are not wired to Emscripten
-	# ports. The existing BF_NO_AUDIO stubs (also used by the dedicated server)
-	# keep the client linking. libpng still comes from -sUSE_LIBPNG.
-	message(STATUS "Emscripten build: audio disabled (BF_NO_AUDIO)")
-	add_definitions(-DBF_NO_AUDIO)
-	set(OPENAL_FOUND FALSE)
-	# TRUE so zap/bitfighter_client.cmake does not depend on an alure target
-	# we are not building. ALURE_LIBRARIES stays empty.
-	set(ALURE_FOUND TRUE)
-	set(OPENAL_INCLUDE_DIR "")
+	# Emscripten's OpenAL maps onto WebAudio (-lopenal). Vorbis and Ogg are
+	# ports. In-tree ALURE decodes wav and ogg on the main thread. Speex has
+	# no port and no sources here, so voice chat stays off. ModPlug likewise,
+	# so tracker music (.xm) is not decoded; menu.ogg and credits.ogg are.
+	message(STATUS "Emscripten audio: OpenAL + ALURE (wav/ogg). No Speex, no ModPlug.")
+	add_definitions(-DBF_NO_VOICECHAT)
+	set(OPENAL_FOUND TRUE)
 	set(OPENAL_LIBRARY "")
-	set(ALURE_LIBRARIES "")
-	set(ALURE_INCLUDE_DIR "")
+	set(OPENAL_INCLUDE_DIR "${EMSCRIPTEN_ROOT_PATH}/system/include/AL")
+	set(PNG_INCLUDE_DIR "")
+	set(PNG_LIBRARY "")
 	set(SPEEX_INCLUDE_DIR "")
 	set(SPEEX_LIBRARIES "")
+	set(MODPLUG_LIBRARIES "")
 	set(OGG_LIBRARIES "")
 	set(VORBIS_LIBRARIES "")
 	set(VORBISFILE_LIBRARIES "")
-	set(MODPLUG_LIBRARIES "")
-	set(PNG_INCLUDE_DIR "")
-	set(PNG_LIBRARY "")
+	# FALSE so the client target depends on the alure library built below.
+	set(ALURE_FOUND FALSE)
+	add_subdirectory(alure)
+	set(ALURE_LIBRARIES alure)
+	set(ALURE_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/alure/include")
 else()
 	find_with_fallback(ALURE ALURE alure)
 	if(NOT ALURE_FOUND)

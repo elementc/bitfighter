@@ -6,7 +6,9 @@
 
 # Ports and WebGL are selected with emcc flags. They must be on the compile
 # line (headers) and the link line (libraries, preload, shell).
-set(EMSCRIPTEN_PORT_FLAGS "-sUSE_SDL=2 -sUSE_LIBPNG=1 -sUSE_ZLIB=1")
+# Ogg/Vorbis decode menu.ogg and credits.ogg. OpenAL and the websocket
+# bridge are link-only libraries, added below.
+set(EMSCRIPTEN_PORT_FLAGS "-sUSE_SDL=2 -sUSE_LIBPNG=1 -sUSE_ZLIB=1 -sUSE_OGG=1 -sUSE_VORBIS=1")
 
 # C++ exceptions: Lua startup catches LuaException. Lua itself still uses
 # setjmp/longjmp, which the default SUPPORT_LONGJMP provides.
@@ -22,6 +24,7 @@ set(EMSCRIPTEN_LINK_FLAGS
 	-sFULL_ES2=1 -sMIN_WEBGL_VERSION=1 -sMAX_WEBGL_VERSION=2 \
 	-sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728 -sSTACK_SIZE=5242880 \
 	-sFORCE_FILESYSTEM=1 \
+	-lopenal -lwebsocket.js \
 	--shell-file ${CMAKE_SOURCE_DIR}/cmake/emscripten/shell.html \
 	--preload-file ${CMAKE_SOURCE_DIR}/resource@/bitfighter"
 )

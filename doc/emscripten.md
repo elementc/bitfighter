@@ -75,7 +75,9 @@ Asyncify was rejected. It rewrites every function that can reach `Platform::slee
 | Threads | `-DNO_THREADS=ON` (`TNL_NO_THREADS`) | pthreads need `SharedArrayBuffer` and cross-origin isolation headers. One-shot threads run inline. `DatabaseAccessThread` drains its queue once instead of looping forever, which would lock the tab. |
 | Master server | `Game::checkConnectionToMaster` returns immediately | The master protocol is raw UDP. Browser sockets are WebSockets, and a hostname lookup cannot block the main thread. |
 | UDP / internet play | Not implemented | `connectLocal` covers a self-hosted game. Real UDP does not exist in the browser. Emscripten's socket layer can open a datagram socket, but it is a WebSocket stand-in, not a peer. |
-| Audio (OpenAL, ALURE, Vorbis, ModPlug, Speex) | `BF_NO_AUDIO` | No Emscripten port is wired for this stack. The existing no-audio stubs (the dedicated-server path) are used. Voice chat goes with it. |
+| Audio | OpenAL (`-lopenal`) and in-tree ALURE, with the Ogg/Vorbis ports | Sound effects are wav files loaded straight into OpenAL. Menu and credits music are ogg. A click or key resumes the WebAudio context (autoplay policy). |
+| Voice chat (Speex) | `BF_NO_VOICECHAT` | There is no Speex port and no Speex sources in the tree. |
+| Tracker music (ModPlug, `.xm`) | Not decoded | No ModPlug port and no ModPlug sources. `menu.ogg` and `credits.ogg` still play. |
 | Discord RPC | `DISCORD=OFF` | The RPC transport is a local socket. |
 | Test suite | Not built | gtest's pthread setup fights the single-threaded build. Native tests are unchanged. |
 

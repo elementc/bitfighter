@@ -7,6 +7,10 @@
 #include "SoundEffect.h"
 #include "tnlLog.h"
 
+#ifdef __EMSCRIPTEN__
+#  include <emscripten.h>
+#endif
+
 #ifndef BF_NO_AUDIO
 
 #include "SFXProfile.h"
@@ -270,7 +274,13 @@ void SoundSystem::init(const string &sfxDir, const string &musicDir, float music
    try
    {
       mDeviceMgr = alure::DeviceManager::getInstance();
+#ifdef __EMSCRIPTEN__
+      // alcOpenDevice accepts NULL or this exact name. The default
+      // openPlayback() passes an empty string, which Emscripten rejects.
+      mDevice = mDeviceMgr.openPlayback("Emscripten OpenAL");
+#else
       mDevice = mDeviceMgr.openPlayback();
+#endif
       if(!mDevice)
       {
          logprintf(LogConsumer::LogError, "Failed to open OpenAL device");
@@ -404,6 +414,35 @@ void SoundSystem::init(const string &sfxDir, const string &musicDir, float music
    alGenBuffers(NumVoiceChatBuffers, gVoiceFreeBuffers.address());
 
    gSFXValid = true;
+
+#ifdef __EMSCRIPTEN__
+   // Browsers start the WebAudio context suspended until a user gesture.
+   EM_ASM({
+      var report = function(ctx) {
+         var queued = 0;
+         if (AL.currentCtx && AL.currentCtx.sources) {
+            for (var id in AL.currentCtx.sources) {
+               var src = AL.currentCtx.sources[id];
+               if (src && src.bufQueue && src.bufQueue.length)
+                  queued++;
+            }
+         }
+         console.log('OpenAL AudioContext state: ' + ctx.state + ' time=' + ctx.currentTime + ' queuedSources=' + queued);
+      };
+      var resume = function() {
+         if (typeof AL === 'undefined' || !AL.currentCtx || !AL.currentCtx.audioCtx)
+            return;
+         var ctx = AL.currentCtx.audioCtx;
+         if (ctx.state === 'suspended')
+            ctx.resume().then(function() { report(ctx); });
+         else
+            report(ctx);
+      };
+      document.addEventListener('pointerdown', resume, true);
+      document.addEventListener('keydown', resume, true);
+      resume();
+   });
+#endif
 }
 
 
