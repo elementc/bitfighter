@@ -51,6 +51,35 @@ Open `http://127.0.0.1:8080/bitfighter.html`.
 
 A copy of this build is published from the `emscripten-poc` branch by `.github/workflows/emscripten-pages.yml` to <https://elementc.github.io/bitfighter/>. That workflow runs only on pushes to `emscripten-poc` (and when started by hand).
 
+## UDP relay
+
+Browsers cannot open raw UDP sockets. Emscripten's `websocket_to_posix_proxy` (`-sPROXY_POSIX_SOCKETS`) does bridge POSIX sockets, but it waits on a futex and needs pthreads plus `SharedArrayBuffer`. GitHub Pages does not send the cross-origin isolation headers that requires, and that mode also fights `emscripten_set_main_loop`. The browser build therefore uses a small relay, `tools/udp-ws-relay/relay.py`.
+
+One WebSocket carries every datagram. Each browser socket is a real UDP socket on the relay. The game code changes only `Socket` send/receive when a relay URL is set. With no URL, sockets stay on the failing POSIX path and a local game still uses `connectLocal`.
+
+```
+python3 tools/udp-ws-relay/relay.py 28080
+```
+
+Open the page as `http://127.0.0.1:8080/bitfighter.html?relay=ws://127.0.0.1:28080`. The query parameter wins. `Module.relay` in the shell is the fallback. The hosted page is HTTPS, so a relay it can actually reach has to be `wss://` (put TLS in front of the Python process). An open `ws://` URL from that page is mixed content and the browser blocks it.
+
+Outbound destination ports default to `25955` (master) and `28000` (game). Override with `RELAY_ALLOW_PORTS=25955,28000,28001` or `RELAY_ALLOW_ANY=1`. The default allowlist is intentional: without it the process is an open UDP proxy. Do not put an unrestricted relay on the public internet.
+
+```
+docker build -t bitfighter-udp-ws-relay tools/udp-ws-relay
+docker run --rm --network host -e RELAY_ALLOW_PORTS=25955,28000 bitfighter-udp-ws-relay
+```
+
+What the relay host needs:
+
+- A TCP port for the WebSocket, and TLS if browsers load the HTTPS Pages build.
+- Outbound UDP, and a NAT that accepts the replies to those sockets. Client-to-server play only needs that.
+- For other people to send *to* the browser (the browser hosting a public game, or an arranged peer connection), the relay's UDP ports have to be reachable from the internet. `--network host` is the straightforward way.
+
+What works: the client talks to the real master at `107.172.71.173:25955` (the hostname entries are skipped, because Emscripten's `getaddrinfo` returns a fake address) and joins a server on an allowed port. Tested against a private `bitfighterd` on `127.0.0.1:28000` with `-serverpassword`.
+
+What does not: arranged (NAT punch) connections. The master tells the client to send to the other peer's ephemeral port, and the default allowlist drops that. `RELAY_ALLOW_ANY=1` lets those packets through, on a host whose UDP ports are public. Two browsers still only see each other as the relay's address, not their own.
+
 The shell passes `-name WebPilot`, so the first screen is the main menu rather than nickname entry. Click the canvas, then:
 
 - Click **HOST GAME**, then **START HOSTING** (or press Enter on that row)
