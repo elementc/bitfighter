@@ -171,19 +171,72 @@ endfunction()
 
 # ALURE
 if(EMSCRIPTEN)
-	# Emscripten's OpenAL maps onto WebAudio (-lopenal). Vorbis and Ogg are
-	# ports. In-tree ALURE decodes wav and ogg on the main thread. Speex has
-	# no port and no sources here, so voice chat stays off. ModPlug likewise,
-	# so tracker music (.xm) is not decoded; menu.ogg and credits.ogg are.
-	message(STATUS "Emscripten audio: OpenAL + ALURE (wav/ogg). No Speex, no ModPlug.")
-	add_definitions(-DBF_NO_VOICECHAT)
+	# OpenAL is the WebAudio port. Vorbis/Ogg and ModPlug are Emscripten
+	# ports (-sUSE_VORBIS, -sUSE_MODPLUG). Speex has no port; it is fetched
+	# below. ALURE decodes wav, ogg, and (via the port) tracker modules.
+	message(STATUS "Emscripten audio: OpenAL + ALURE + Vorbis + ModPlug + Speex")
+	include(FetchContent)
+	FetchContent_Declare(speex
+		URL https://downloads.xiph.org/releases/speex/speex-1.2.1.tar.gz
+		URL_HASH SHA256=4b44d4f2b38a370a2d98a78329fefc56a0cf93d1c1be70029217baae6628feea
+	)
+	FetchContent_GetProperties(speex)
+	if(NOT speex_POPULATED)
+		FetchContent_Populate(speex)
+	endif()
+	configure_file(
+		${CMAKE_SOURCE_DIR}/cmake/emscripten/speex/speex_config_types.h
+		${speex_SOURCE_DIR}/include/speex/speex_config_types.h
+		COPYONLY
+	)
+	set(SPEEX_SRC_DIR ${speex_SOURCE_DIR}/libspeex)
+	set(SPEEX_SOURCES
+		${SPEEX_SRC_DIR}/cb_search.c
+		${SPEEX_SRC_DIR}/exc_10_32_table.c
+		${SPEEX_SRC_DIR}/exc_8_128_table.c
+		${SPEEX_SRC_DIR}/filters.c
+		${SPEEX_SRC_DIR}/gain_table.c
+		${SPEEX_SRC_DIR}/hexc_table.c
+		${SPEEX_SRC_DIR}/high_lsp_tables.c
+		${SPEEX_SRC_DIR}/lsp.c
+		${SPEEX_SRC_DIR}/ltp.c
+		${SPEEX_SRC_DIR}/speex.c
+		${SPEEX_SRC_DIR}/stereo.c
+		${SPEEX_SRC_DIR}/vbr.c
+		${SPEEX_SRC_DIR}/vq.c
+		${SPEEX_SRC_DIR}/bits.c
+		${SPEEX_SRC_DIR}/exc_10_16_table.c
+		${SPEEX_SRC_DIR}/exc_20_32_table.c
+		${SPEEX_SRC_DIR}/exc_5_256_table.c
+		${SPEEX_SRC_DIR}/exc_5_64_table.c
+		${SPEEX_SRC_DIR}/gain_table_lbr.c
+		${SPEEX_SRC_DIR}/hexc_10_32_table.c
+		${SPEEX_SRC_DIR}/lpc.c
+		${SPEEX_SRC_DIR}/lsp_tables_nb.c
+		${SPEEX_SRC_DIR}/modes.c
+		${SPEEX_SRC_DIR}/modes_wb.c
+		${SPEEX_SRC_DIR}/nb_celp.c
+		${SPEEX_SRC_DIR}/quant_lsp.c
+		${SPEEX_SRC_DIR}/sb_celp.c
+		${SPEEX_SRC_DIR}/speex_callbacks.c
+		${SPEEX_SRC_DIR}/speex_header.c
+		${SPEEX_SRC_DIR}/window.c
+	)
+	add_library(speex STATIC ${SPEEX_SOURCES})
+	target_include_directories(speex
+		PUBLIC ${speex_SOURCE_DIR}/include
+		PRIVATE ${CMAKE_SOURCE_DIR}/cmake/emscripten/speex ${SPEEX_SRC_DIR}
+	)
+	target_compile_definitions(speex PRIVATE HAVE_CONFIG_H FLOATING_POINT)
+	set(SPEEX_LIBRARIES speex)
+	set(SPEEX_INCLUDE_DIR "${speex_SOURCE_DIR}/include")
+
 	set(OPENAL_FOUND TRUE)
 	set(OPENAL_LIBRARY "")
 	set(OPENAL_INCLUDE_DIR "${EMSCRIPTEN_ROOT_PATH}/system/include/AL")
 	set(PNG_INCLUDE_DIR "")
 	set(PNG_LIBRARY "")
-	set(SPEEX_INCLUDE_DIR "")
-	set(SPEEX_LIBRARIES "")
+	# The port is linked via -sUSE_MODPLUG. ALURE calls it; no extra cmake lib.
 	set(MODPLUG_LIBRARIES "")
 	set(OGG_LIBRARIES "")
 	set(VORBIS_LIBRARIES "")

@@ -24,6 +24,7 @@
 
 #include "tnlByteBuffer.h"
 #include "tnlNetBase.h"
+#include "voiceCodec.h"
 
 #include <cstring>
 
@@ -416,8 +417,8 @@ void SoundSystem::init(const string &sfxDir, const string &musicDir, float music
    gSFXValid = true;
 
 #ifdef __EMSCRIPTEN__
-   // Menu music is ogg. Game tracks are xm and use this same decoder.
-   // Read far enough to get past a silent intro and confirm samples.
+   // Prove tracker music and Speex on this build. Menu music is ogg; game
+   // tracks are xm and go through the same ALURE decoder.
    for(S32 i = 0; i < mGameMusicList.size(); i++)
    {
       const string &track = mGameMusicList[i];
@@ -459,6 +460,30 @@ void SoundSystem::init(const string &sfxDir, const string &musicDir, float music
          logprintf(LogConsumer::LogError, "ModPlug failed %s: %s", track.c_str(), ex.what());
       }
       break;
+   }
+
+   {
+      SpeexVoiceEncoder encoder;
+      SpeexVoiceDecoder decoder;
+      U32 samples = encoder.getSamplesPerFrame();
+      S16 input[320];
+      S16 output[320];
+      U8 compressed[64];
+      if(samples > 0 && samples <= 320)
+      {
+         for(U32 i = 0; i < samples; i++)
+            input[i] = (S16)(8000 * ((i / 8) & 1 ? 1 : -1));
+         U32 nbytes = encoder.compressFrame(input, compressed);
+         decoder.decompressFrame(output, compressed, nbytes);
+         S16 peak = 0;
+         for(U32 i = 0; i < samples; i++)
+         {
+            S16 v = output[i] < 0 ? (S16)-output[i] : output[i];
+            if(v > peak) peak = v;
+         }
+         logprintf(LogConsumer::LogConnection,
+                   "Speex roundtrip: frame=%u bytes=%u peak=%d", samples, nbytes, (int)peak);
+      }
    }
 
    // Browsers start the WebAudio context suspended until a user gesture.
@@ -1408,7 +1433,14 @@ bool SoundSystem::startRecording()
 {
    captureDevice = alcCaptureOpenDevice(NULL, 8000, AL_FORMAT_MONO16, 2048);
    if(alGetError() != AL_NO_ERROR || captureDevice == NULL)
+   {
+#ifdef __EMSCRIPTEN__
+      // The OpenAL port captures through getUserMedia. That needs a user
+      // gesture and a permission prompt; headless runs have no microphone.
+      logprintf(LogConsumer::LogWarning, "Microphone capture is not available");
+#endif
       return false;
+   }
 
    alcCaptureStart(captureDevice);
    return true;

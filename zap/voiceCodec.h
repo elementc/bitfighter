@@ -8,8 +8,7 @@
 
 #include "tnlByteBuffer.h"
 
-#if defined(TNL_OS_MOBILE) || defined(BF_NO_AUDIO) || defined(__EMSCRIPTEN__)
-// No Speex port and no in-tree Speex sources for the browser build.
+#if defined(TNL_OS_MOBILE) || defined(BF_NO_AUDIO)
 #  define BF_NO_VOICECHAT
 #endif
 
