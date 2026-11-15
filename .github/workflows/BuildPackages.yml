@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - ci-macos-26
   release:
   pull_request:
 jobs:
